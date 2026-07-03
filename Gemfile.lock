@@ -1,0 +1,17 @@
+GEM
+  remote: https://rubygems.org/
+  specs:
+    shifty (0.5.0)
+
+PLATFORMS
+  arm64-darwin-25
+  ruby
+
+DEPENDENCIES
+  shifty
+
+CHECKSUMS
+  shifty (0.5.0) sha256=f569085b5f72995c7b60c0c96f4cef06239b7830e2d106dc54f75d166ded44a3
+
+BUNDLED WITH
+  4.0.10
