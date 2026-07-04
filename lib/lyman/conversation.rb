@@ -45,7 +45,7 @@ module Lyman
     end
 
     def last_assistant_content
-      message = @messages.reverse.find { |m| m["role"] == "assistant" }
+      message = @messages.rfind { |m| m["role"] == "assistant" }
       message && message["content"]
     end
 

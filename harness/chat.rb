@@ -14,12 +14,14 @@
 $LOAD_PATH.unshift File.expand_path("../lib", __dir__)
 require "lyman"
 
-include Shifty::DSL
+# This is a top-level wiring script by design; mixing the DSL into main
+# is the point, not an accident.
+include Shifty::DSL # standard:disable Style/MixinUsage
 
 $stdout.sync = true
 
 BASE_URL = ENV.fetch("LYMAN_BASE_URL", "http://localhost:11434/v1")
-MODEL    = ENV.fetch("LYMAN_MODEL", "gemma4:latest")
+MODEL = ENV.fetch("LYMAN_MODEL", "gemma4:latest")
 
 # ── Tools: schema and handler side by side, guts on the outside ────────────
 TOOLS = {
@@ -36,7 +38,7 @@ TOOLS = {
   }
 }
 
-schemas  = TOOLS.values.map { |tool| tool[:schema] }
+schemas = TOOLS.values.map { |tool| tool[:schema] }
 handlers = TOOLS.transform_values { |tool| tool[:handler] }
 
 # ── Display: fitting this harness to its models ─────────────────────────────
@@ -199,21 +201,26 @@ printer = RoundPrinter.new(MODEL)
 
 # ── The circuit ─────────────────────────────────────────────────────────────
 pipeline =
-  source_worker { rounds.shift }                                             |
-  side_worker { |_c| printer.start_round }                                   |
+  source_worker { rounds.shift } |
+  side_worker { |_c| printer.start_round } |
   Lyman::Workers.chat_completion(
     base_url: BASE_URL, model: MODEL, tools: schemas,
     on_delta: printer.method(:delta)
-  )                                                                          |
-  side_worker { |_c| printer.finish_round }                                  |
-  relay_worker { |c| c.finish! if c.pending_tool_calls.empty? || c.runaway?; c } |
+  ) |
+  side_worker { |_c| printer.finish_round } |
+  relay_worker { |c|
+    c.finish! if c.pending_tool_calls.empty? || c.runaway?
+    c
+  } |
   side_worker do |c|
-    c.pending_tool_calls.each do |tc|
-      puts "  ⚙ #{tc.dig("function", "name")} #{tc.dig("function", "arguments")}"
-    end unless c.finished?
-  end                                                                        |
-  Lyman::Workers.tool_execution(handlers)                                    |
-  side_worker { |c| rounds << c unless c.finished? }                         |
+    unless c.finished?
+      c.pending_tool_calls.each do |tc|
+        puts "  ⚙ #{tc.dig("function", "name")} #{tc.dig("function", "arguments")}"
+      end
+    end
+  end |
+  Lyman::Workers.tool_execution(handlers) |
+  side_worker { |c| rounds << c unless c.finished? } |
   filter_worker { |c| c.finished? }
 
 # ── Shell process ───────────────────────────────────────────────────────────
