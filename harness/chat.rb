@@ -5,11 +5,18 @@
 # This file is the one legible wiring script — the circuit pattern from
 # docs/design/circuit-pattern.md, wired filter-in: one `pipeline.shift`
 # per turn, with all model⇄tool rounds happening inside the call.
+#
+# Everything the model does streams to the terminal as it happens —
+# pre-tool narration, tool calls, the final answer. Fitting the display
+# to the model (like hiding a <think> block) is this shell's job, not
+# the library's.
 
 $LOAD_PATH.unshift File.expand_path("../lib", __dir__)
 require "lyman"
 
 include Shifty::DSL
+
+$stdout.sync = true
 
 BASE_URL = ENV.fetch("LYMAN_BASE_URL", "http://localhost:11434/v1")
 MODEL    = ENV.fetch("LYMAN_MODEL", "gemma4:latest")
@@ -32,9 +39,123 @@ TOOLS = {
 schemas  = TOOLS.values.map { |tool| tool[:schema] }
 handlers = TOOLS.transform_values { |tool| tool[:handler] }
 
-# Local thinking models may prefix replies with <think>...</think>.
-def display(content)
-  content.to_s.sub(/\A<think>.*?<\/think>\s*/m, "").strip
+# ── Display: fitting this harness to its models ─────────────────────────────
+
+# Local thinking models may prefix replies with <think>...</think>. When the
+# reply arrives one fragment at a time we can't regex the whole thing, so
+# this holds back anything that might still turn out to be part of a leading
+# think block, and releases the rest.
+class ThinkFilter
+  OPEN = "<think>"
+  CLOSE = "</think>"
+
+  def initialize
+    @state = :start
+    @buffer = +""
+  end
+
+  # Returns the printable portion of this fragment.
+  def filter(fragment)
+    @buffer << fragment
+    case @state
+    when :start then filter_start
+    when :thinking then filter_thinking
+    when :after_think then filter_after_think
+    when :passing then take_buffer
+    end
+  end
+
+  # Call when the message is complete: releases anything still held back
+  # (e.g. a reply that was nothing but "<thin").
+  def flush
+    (@state == :start) ? take_buffer : ""
+  end
+
+  private
+
+  def take_buffer
+    out = @buffer
+    @buffer = +""
+    out
+  end
+
+  def filter_start
+    if @buffer.start_with?(OPEN)
+      @state = :thinking
+      @buffer = @buffer[OPEN.length..]
+      filter_thinking
+    elsif OPEN.start_with?(@buffer)
+      "" # could still become <think>; wait for more
+    else
+      @state = :passing
+      take_buffer
+    end
+  end
+
+  def filter_thinking
+    if (idx = @buffer.index(CLOSE))
+      @state = :after_think
+      @buffer = @buffer[(idx + CLOSE.length)..]
+      filter_after_think
+    else
+      # Discard thought text, but keep any tail that could be the start
+      # of CLOSE split across fragments.
+      @buffer = partial_close_suffix
+      ""
+    end
+  end
+
+  def filter_after_think
+    stripped = @buffer.lstrip
+    if stripped.empty?
+      @buffer = +""
+      ""
+    else
+      @state = :passing
+      @buffer = stripped
+      take_buffer
+    end
+  end
+
+  def partial_close_suffix
+    (1...CLOSE.length).reverse_each do |len|
+      tail = @buffer[-len, len]
+      return tail if tail && CLOSE.start_with?(tail)
+    end
+    +""
+  end
+end
+
+# Streams one round's content to the terminal, printing the model label
+# before the first visible text so silent rounds (pure tool calls) don't
+# leave an empty prompt behind.
+class RoundPrinter
+  def initialize(label)
+    @label = label
+  end
+
+  def start_round
+    @filter = ThinkFilter.new
+    @printed = false
+  end
+
+  def delta(text)
+    emit(@filter.filter(text))
+  end
+
+  def finish_round
+    emit(@filter.flush)
+    puts if @printed
+  end
+
+  private
+
+  def emit(text)
+    return if text.empty?
+    print "\n#{@label}> " unless @printed
+    @printed = true
+    print text
+  end
 end
 
 # ── Shell state ─────────────────────────────────────────────────────────────
@@ -42,13 +163,17 @@ conversation = Lyman::Conversation.new(
   system_prompt: "You are a helpful assistant. Keep replies brief."
 )
 rounds = [] # the circuit's queue — visible right here, not smuggled
+printer = RoundPrinter.new(MODEL)
 
 # ── The circuit ─────────────────────────────────────────────────────────────
 pipeline =
   source_worker { rounds.shift }                                             |
+  side_worker { |_c| printer.start_round }                                   |
   Lyman::Workers.chat_completion(
-    base_url: BASE_URL, model: MODEL, tools: schemas
+    base_url: BASE_URL, model: MODEL, tools: schemas,
+    on_delta: printer.method(:delta)
   )                                                                          |
+  side_worker { |_c| printer.finish_round }                                  |
   relay_worker { |c| c.finish! if c.pending_tool_calls.empty? || c.runaway?; c } |
   side_worker do |c|
     c.pending_tool_calls.each do |tc|
@@ -76,6 +201,5 @@ loop do
   break if input.nil? || input.empty?
 
   rounds << conversation.add_user_message(input)
-  turn = pipeline.shift
-  puts "\n#{MODEL}> #{display(turn.last_assistant_content)}"
+  pipeline.shift
 end
