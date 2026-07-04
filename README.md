@@ -122,13 +122,25 @@ questions — is in [docs/vision.md](docs/vision.md).
   Lyman's bet is that shifty makes those things easy enough to build yourself
   that shipping them all would be beside the point.
 
+## Where it's going
+
+Today you use lyman by working in this repo. Where it's headed — designed but
+not yet built — is a **pure generator**, in the spirit of shadcn/ui: a gem
+whose whole job is to plant legible, manifest-tracked modules into *your*
+project, individually upgradeable and yours to extend — or eject and adopt
+outright. No runtime framework to call into; your harness's only runtime
+dependency is shifty. "Guts on the outside" extends to whose tree the code
+lives in. The design is written down in
+[docs/design/deployment.md](docs/design/deployment.md).
+
 ## Status
 
-Early and moving. What exists today: the vision and circuit-pattern design
-docs, the core `Conversation` item, chat-completion and tool-execution
-workers, and a working tool-using chat harness against live local models.
-On deck: tests, tool-call fan-out, a one-shot (non-REPL) harness, and
-scaffolding for spinning up new harnesses.
+Early and moving. What exists today: the vision, circuit-pattern, and
+deployment design docs, the core `Conversation` item, chat-completion and
+tool-execution workers, and a working tool-using chat harness against live
+local models. On deck: tests, tool-call fan-out, a one-shot (non-REPL)
+harness, and the `lyman` generator CLI (`new` / `add` / `update` / `eject`)
+described in [docs/design/deployment.md](docs/design/deployment.md).
 
 ## License
 
