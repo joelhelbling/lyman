@@ -78,6 +78,12 @@ makes fast iteration *possible*.
 - **Scaffolding is a co-equal concept.** "Lyman gives you a working harness *and*
   the means to spin up new ones." With good docs/skills, agentic tools (e.g.
   Claude Code) should be able to author lyman harnesses easily.
+- **Delivered as a pure generator** (see
+  [design/deployment.md](design/deployment.md)): lyman plants legible source
+  into the client project rather than being a runtime framework dependency.
+  Planted modules are manifest-tracked and individually upgradeable; the
+  harness is the user's from day one. The unit of upgrade is the unit of
+  extraction.
 
 ---
 

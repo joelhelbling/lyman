@@ -5,9 +5,11 @@ in Ruby, built on the [shifty](https://github.com/joelhelbling/shifty) gem's
 pipeline-of-workers model. It targets people building narrow, purpose-built
 agentic workflows on local/open-weight models, where fast iteration is the edge.
 
-Read `docs/vision.md` (the why, the values, the architecture decisions) and
+Read `docs/vision.md` (the why, the values, the architecture decisions),
 `docs/design/circuit-pattern.md` (how the model⇄tool loop works in a linear
-pull pipeline) before making design-level changes. Those documents are the
+pull pipeline), and `docs/design/deployment.md` (lyman as a pure generator:
+manifest-tracked planted modules, eject-to-own, unit of upgrade = unit of
+extraction) before making design-level changes. Those documents are the
 source of truth for intent; this file is a summary plus working conventions.
 
 ## Commands
