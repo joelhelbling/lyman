@@ -1,6 +1,7 @@
 GEM
   remote: https://rubygems.org/
   specs:
+    ostruct (0.6.3)
     shifty (0.5.0)
 
 PLATFORMS
@@ -8,9 +9,11 @@ PLATFORMS
   ruby
 
 DEPENDENCIES
+  ostruct
   shifty
 
 CHECKSUMS
+  ostruct (0.6.3) sha256=95a2ed4a4bd1d190784e666b47b2d3f078e4a9efda2fccf18f84ddc6538ed912
   shifty (0.5.0) sha256=f569085b5f72995c7b60c0c96f4cef06239b7830e2d106dc54f75d166ded44a3
 
 BUNDLED WITH
