@@ -12,7 +12,7 @@ require "lyman"
 include Shifty::DSL
 
 BASE_URL = ENV.fetch("LYMAN_BASE_URL", "http://localhost:11434/v1")
-MODEL    = ENV.fetch("LYMAN_MODEL", "qwen3.5:2b")
+MODEL    = ENV.fetch("LYMAN_MODEL", "gemma4:latest")
 
 # ── Tools: schema and handler side by side, guts on the outside ────────────
 TOOLS = {
@@ -60,7 +60,15 @@ pipeline =
   filter_worker { |c| c.finished? }
 
 # ── Shell process ───────────────────────────────────────────────────────────
-puts "lyman ⇢ #{MODEL} @ #{BASE_URL}  (blank line or ctrl-d exits)"
+puts <<~PREAMBLE
+  lyman ⇢ #{MODEL} @ #{BASE_URL}
+
+    exit:      blank line or ctrl-d
+    model:     LYMAN_MODEL=qwen3.5:2b #{$PROGRAM_NAME}
+    endpoint:  LYMAN_BASE_URL=http://localhost:1234/v1 #{$PROGRAM_NAME}
+    tools:     #{TOOLS.keys.join(", ")} — a ⚙ line appears when the model calls one
+
+PREAMBLE
 
 loop do
   print "\nyou> "
