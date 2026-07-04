@@ -16,6 +16,12 @@ module Lyman
     # with the fully-assembled message appended, so the circuit sees no
     # difference between streamed and unstreamed rounds.
     #
+    # Servers disagree about where thinking goes: some put <think> tags
+    # inline in the content, others (e.g. Ollama) stream a separate
+    # reasoning field. The worker normalizes the latter to the former,
+    # so on_delta always sees one convention: <think>...</think> inline.
+    # The raw reasoning text still lands on the message unaltered.
+    #
     # This is the only part of lyman that knows HTTP exists.
     def self.chat_completion(base_url:, model:, tools: nil, read_timeout: 300, on_delta: nil)
       uri = URI("#{base_url.chomp("/")}/chat/completions")
@@ -64,6 +70,7 @@ module Lyman
 
       message = {"role" => "assistant", "content" => nil}
       tool_calls = {}
+      state = {thinking: false}
       buffer = +""
 
       http.request(request) do |response|
@@ -83,11 +90,12 @@ module Lyman
             next if data == "[DONE]"
 
             delta = JSON.parse(data).dig("choices", 0, "delta")
-            apply_delta(message, tool_calls, delta, on_delta) if delta
+            apply_delta(message, tool_calls, delta, on_delta, state) if delta
           end
         end
       end
 
+      on_delta.call("</think>") if state[:thinking] # reasoning ran to stream end
       unless tool_calls.empty?
         message["tool_calls"] = tool_calls.keys.sort.map { |index| tool_calls[index] }
       end
@@ -96,9 +104,24 @@ module Lyman
 
     # Content deltas concatenate; tool-call deltas arrive as fragments
     # keyed by index, with the arguments string dribbling in over many
-    # chunks.
-    def self.apply_delta(message, tool_calls, delta, on_delta)
-      if (text = delta["content"])
+    # chunks. Reasoning-field deltas stream to on_delta wrapped in
+    # synthesized <think> tags (see chat_completion).
+    def self.apply_delta(message, tool_calls, delta, on_delta, state)
+      reasoning = delta["reasoning"] || delta["reasoning_content"]
+      if reasoning && !reasoning.empty?
+        unless state[:thinking]
+          state[:thinking] = true
+          on_delta.call("<think>")
+        end
+        message["reasoning"] = (message["reasoning"] || +"") + reasoning
+        on_delta.call(reasoning)
+      end
+
+      if (text = delta["content"]) && !text.empty?
+        if state[:thinking]
+          state[:thinking] = false
+          on_delta.call("</think>")
+        end
         message["content"] = (message["content"] || +"") + text
         on_delta.call(text)
       end

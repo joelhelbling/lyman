@@ -41,17 +41,23 @@ handlers = TOOLS.transform_values { |tool| tool[:handler] }
 
 # ── Display: fitting this harness to its models ─────────────────────────────
 
-# Local thinking models may prefix replies with <think>...</think>. When the
-# reply arrives one fragment at a time we can't regex the whole thing, so
-# this holds back anything that might still turn out to be part of a leading
-# think block, and releases the rest.
+# Thinking models prefix replies with <think>...</think> (the worker
+# normalizes separate-reasoning-field servers to the same convention). When
+# the reply arrives one fragment at a time we can't regex the whole thing, so
+# this streams a short preview of the thinking — the first few lines — then
+# elides the rest, closing with "...</think>" once the model stops thinking.
 class ThinkFilter
   OPEN = "<think>"
   CLOSE = "</think>"
+  SNIPPET_LINES = 3
+  SNIPPET_CHARS = 240 # think blocks are often one long unwrapped paragraph
 
   def initialize
     @state = :start
     @buffer = +""
+    @lines = 0
+    @chars = 0
+    @truncated = false
   end
 
   # Returns the printable portion of this fragment.
@@ -66,9 +72,14 @@ class ThinkFilter
   end
 
   # Call when the message is complete: releases anything still held back
-  # (e.g. a reply that was nothing but "<thin").
+  # (e.g. a reply that was nothing but "<thin"), and closes a think block
+  # the model never closed itself.
   def flush
-    (@state == :start) ? take_buffer : ""
+    case @state
+    when :start then take_buffer
+    when :thinking then (@truncated ? "..." : "") + CLOSE
+    else ""
+    end
   end
 
   private
@@ -83,7 +94,7 @@ class ThinkFilter
     if @buffer.start_with?(OPEN)
       @state = :thinking
       @buffer = @buffer[OPEN.length..]
-      filter_thinking
+      OPEN + filter_thinking
     elsif OPEN.start_with?(@buffer)
       "" # could still become <think>; wait for more
     else
@@ -94,17 +105,38 @@ class ThinkFilter
 
   def filter_thinking
     if (idx = @buffer.index(CLOSE))
-      @state = :after_think
+      thought = @buffer[0...idx]
       @buffer = @buffer[(idx + CLOSE.length)..]
-      filter_after_think
+      @state = :after_think
+      snippet(thought) + (@truncated ? "..." : "") + CLOSE + "\n\n" + filter_after_think
     else
-      # Discard thought text, but keep any tail that could be the start
-      # of CLOSE split across fragments.
-      @buffer = partial_close_suffix
-      ""
+      # Keep any tail that could be the start of CLOSE split across
+      # fragments; preview the rest.
+      keep = partial_close_suffix
+      thought = @buffer[0, @buffer.length - keep.length]
+      @buffer = keep
+      snippet(thought)
     end
   end
 
+  # The leading portion of the thought that fits the preview budget.
+  def snippet(text)
+    return "" if @truncated
+    out = +""
+    text.each_char do |ch|
+      if @chars >= SNIPPET_CHARS || (ch == "\n" && @lines >= SNIPPET_LINES - 1)
+        @truncated = true
+        break
+      end
+      out << ch
+      @chars += 1
+      @lines += 1 if ch == "\n"
+    end
+    out
+  end
+
+  # We print "</think>\n\n" ourselves, so swallow the model's own
+  # whitespace between the close tag and the reply.
   def filter_after_think
     stripped = @buffer.lstrip
     if stripped.empty?
