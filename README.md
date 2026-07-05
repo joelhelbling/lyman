@@ -122,25 +122,39 @@ questions — is in [docs/vision.md](docs/vision.md).
   Lyman's bet is that shifty makes those things easy enough to build yourself
   that shipping them all would be beside the point.
 
-## Where it's going
+## The generator
 
-Today you use lyman by working in this repo. Where it's headed — designed but
-not yet built — is a **pure generator**, in the spirit of shadcn/ui: a gem
-whose whole job is to plant legible, manifest-tracked modules into *your*
+Lyman is delivered as a **pure generator**, in the spirit of shadcn/ui: the
+gem's whole job is to plant legible, manifest-tracked modules into *your*
 project, individually upgradeable and yours to extend — or eject and adopt
 outright. No runtime framework to call into; your harness's only runtime
 dependency is shifty. "Guts on the outside" extends to whose tree the code
-lives in. The design is written down in
+lives in. The reasoning is written down in
 [docs/design/deployment.md](docs/design/deployment.md).
+
+```sh
+lyman new my-agent      # scaffold a project: harness, workers, manifest
+lyman list              # what lyman installs, and this project's status
+lyman update            # refresh pristine modules; halt (never clobber) on modified ones
+lyman diff conversation # your changes, and upstream's since you planted
+lyman eject conversation# take ownership; lyman stops managing it
+lyman doctor            # smoke-test the pipeline against a stub transport
+```
+
+`.lyman/manifest.yml` records what was planted, at which version, with which
+content hash — so `update` knows pristine from modified, ejected modules get
+upstream-change advisories instead of merges, and your harness script is never
+touched at all: it's yours from day one.
 
 ## Status
 
 Early and moving. What exists today: the vision, circuit-pattern, and
 deployment design docs, the core `Conversation` item, chat-completion and
-tool-execution workers, and a working tool-using chat harness against live
-local models. On deck: tests, tool-call fan-out, a one-shot (non-REPL)
-harness, and the `lyman` generator CLI (`new` / `add` / `update` / `eject`)
-described in [docs/design/deployment.md](docs/design/deployment.md).
+tool-execution workers, a working tool-using chat harness against live local
+models, and the generator CLI (`new` / `add` / `update` / `eject` / `diff` /
+`doctor` / `list`) with a Minitest suite behind it. Not yet published to
+rubygems.org — for now, run it from a checkout. On deck: publishing the gem,
+tool-call fan-out, and a one-shot (non-REPL) harness.
 
 ## License
 

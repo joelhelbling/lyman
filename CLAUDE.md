@@ -20,17 +20,34 @@ source of truth for intent; this file is a summary plus working conventions.
   before committing and keep the tree offense-free. `bundle exec standardrb --fix`
   handles most issues. Prefer fixing code over disabling cops; when a disable is
   genuinely warranted (rare), scope it to the line and add a comment saying why.
+- `bundle exec rake test` — run the Minitest suite (it covers the generator
+  CLI; tests drive observable behavior — CLI in, files/manifest/output out).
 - `ruby harness/chat.rb` — run the interactive chat harness against a local
   OpenAI-compatible endpoint (defaults: Ollama at `http://localhost:11434/v1`,
   model `gemma4:latest`; override with `LYMAN_MODEL` / `LYMAN_BASE_URL`).
   Verifying behavior end-to-end requires a local model server to be running.
+- `bundle exec exe/lyman` — the generator CLI (`new` / `add` / `update` /
+  `eject` / `diff` / `doctor` / `list`). `LYMAN_SOURCE_ROOT` points it at an
+  alternate artifact-source tree — how tests simulate a newer lyman release.
 
 ## Layout
 
-- `lib/lyman/` — the library: `Conversation` (the item that flows through
-  pipelines) and `Workers` (factories like `chat_completion`, `tool_execution`).
+- `lib/lyman/` — the plantable library: `Conversation` (the item that flows
+  through pipelines) and `Workers` (factories like `chat_completion`,
+  `tool_execution`). These files are both what this repo runs and what the
+  generator plants into client projects — one copy, kept alive by use.
+- `lib/lyman/cli/` — generator machinery (Thor CLI, registry, manifest,
+  planter). Never planted into client projects. The boundary between what
+  lyman *does* (this directory) and what it *installs* is the registry,
+  `lib/lyman/cli/registry.rb` — every plantable artifact is declared there;
+  add to that list, don't invent a parallel convention.
+- `templates/` — plantable artifacts that aren't this repo's own working
+  files (the client `CLAUDE.md` and `Gemfile`, the glob-based client
+  `lib/lyman.rb` entry point).
 - `harness/chat.rb` — the shipped example harness: the one legible wiring
-  script. It is a deliberately top-level Ruby script, not a class.
+  script. It is a deliberately top-level Ruby script, not a class — and it is
+  the source planted by `lyman new`, owned by the user from day one.
+- `test/` — Minitest suite for the generator CLI.
 - `docs/` — vision and design notes. Design decisions get written down here.
 
 ## Core principles (apply these to every change)
@@ -80,8 +97,8 @@ Concrete consequences:
 - Match the existing comment style: comments explain *why* and record design
   intent, not what the next line does.
 - Verify pipeline changes against a live local model when possible; the harness
-  is the integration test bed. There is no automated test suite yet — when
-  adding one or writing tests, drive them from observable behavior (inputs,
-  outputs, worker interactions), not internal implementation detail.
+  is the integration test bed for the library. The Minitest suite covers the
+  generator CLI — keep tests driven from observable behavior (inputs, outputs,
+  worker interactions), not internal implementation detail.
 - Record significant design decisions in `docs/design/` rather than letting
   them live only in code or commit messages.
