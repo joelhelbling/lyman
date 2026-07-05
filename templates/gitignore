@@ -1,0 +1,5 @@
+*.gem
+.DS_Store
+
+# .lyman/ is project state (the manifest + pristine copies), not build
+# output — it belongs in git, not here.
