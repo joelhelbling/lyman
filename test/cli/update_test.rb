@@ -16,7 +16,8 @@ class UpdateTest < Minitest::Test
           manifest = Lyman::CLI::Manifest.load(Dir.pwd)
           expected_hash = Lyman::CLI::Planter.hash(content)
           assert_equal expected_hash, manifest.artifact("conversation")["hash"]
-          assert_equal expected_hash, Lyman::CLI::Planter.hash(manifest.read_pristine("conversation"))
+          assert_equal expected_hash,
+            Lyman::CLI::Planter.hash(manifest.read_pristine("lib/lyman/conversation.rb"))
         end
       end
     end
@@ -47,7 +48,7 @@ class UpdateTest < Minitest::Test
 
         refute_equal 0, result.status
         assert_includes result.out, "conversation"
-        assert_includes result.out, ".lyman/pristine/conversation"
+        assert_includes result.out, ".lyman/pristine/lib/lyman/conversation.rb"
         assert_includes result.out, "lyman diff"
         assert_includes result.out, "lyman eject"
         assert_equal modified, File.read("lib/lyman/conversation.rb")
@@ -87,6 +88,30 @@ class UpdateTest < Minitest::Test
           second = run_cli("update")
           refute_includes second.out, "upstream changes"
         end
+      end
+    end
+  end
+
+  def test_halts_when_manifest_path_disagrees_with_registry_dest
+    in_tmpdir do
+      project = scaffold_project
+
+      Dir.chdir(project) do
+        # Simulate a relocation: the file (and the manifest's record of it)
+        # live somewhere this release's registry doesn't expect.
+        FileUtils.mkdir_p("lib/elsewhere")
+        FileUtils.mv("lib/lyman/conversation.rb", "lib/elsewhere/conversation.rb")
+        manifest = Lyman::CLI::Manifest.load(Dir.pwd)
+        entry = manifest.artifact("conversation")
+        manifest.set_artifact("conversation", entry.merge("path" => "lib/elsewhere/conversation.rb"))
+        manifest.save
+
+        result = run_cli("update")
+
+        refute_equal 0, result.status
+        assert_includes result.out, "lib/elsewhere/conversation.rb"
+        assert_includes result.out, "lib/lyman/conversation.rb"
+        assert File.exist?("lib/elsewhere/conversation.rb"), "expected relocated file untouched"
       end
     end
   end

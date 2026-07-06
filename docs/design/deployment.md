@@ -73,6 +73,18 @@ content hash. `lyman update` then has three cheap cases per file:
   instead of "something changed."
 - **Not in manifest** — user-owned; never touched.
 
+Every entry also records the artifact's planted `path`. Artifact names are
+logical identities (the changelog speaks in module names, and a name survives
+upstream relocating a file); the path is where *this project's* copy lives.
+Recording it keeps each entry self-describing — an entry for an artifact some
+future lyman release renamed or dropped still names its file — and lets
+lifecycle commands operate from the manifest alone, consulting the registry
+only for what the current release would plant. The pristine cache mirrors the
+planted tree (`.lyman/pristine/lib/lyman/…`), so neither store depends on
+artifact names staying collision-free forever. When a release's destination
+disagrees with the manifest's path, `update` halts rather than guessing which
+references a move would break.
+
 Per-artifact versioning falls out of the manifest for free: the changelog can
 speak in terms of named modules ("`think_filter` 0.3 → 0.4: constructor now
 takes…"), and `update` emits deprecation notices only for modules the project
@@ -97,9 +109,10 @@ Ejection leaves a **tombstone record**, not a deleted entry:
 
 ```yaml
 think_filter:
-  status: ejected        # was: managed
-  ejected_at: 0.3.0      # lyman version when the dev took ownership
-  pristine_hash: abc123  # hash of the pristine copy at ejection time
+  status: ejected                  # was: managed
+  ejected_at: 0.3.0                # lyman version when the dev took ownership
+  path: lib/lyman/think_filter.rb  # where it was planted; the fork lives here
+  pristine_hash: abc123            # hash of the pristine copy at ejection time
 ```
 
 The tombstone buys three things a bare deletion can't:

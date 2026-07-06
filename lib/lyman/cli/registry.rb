@@ -65,6 +65,27 @@ module Lyman
         end
       end
 
+      # Commands accept an artifact name or a project-relative path — you
+      # shouldn't have to remember the token while looking at the file.
+      # Resolution order: registry name, then the path recorded in this
+      # project's manifest (authoritative for where the file actually is),
+      # then the registry's dest (for artifacts not yet planted).
+      def self.resolve(token, manifest: nil)
+        return token if ARTIFACTS.key?(token)
+
+        path = token.delete_prefix("./")
+        if manifest
+          name, _entry = manifest.artifacts.find { |_, entry| entry["path"] == path }
+          return name if name
+        end
+        name, _spec = ARTIFACTS.find { |_, spec| spec[:dest] == path }
+        return name if name
+
+        valid = ARTIFACTS.keys.join(", ")
+        raise Thor::Error, "Unknown artifact #{token.inspect}. " \
+          "Give an artifact name (#{valid}) or a planted path (e.g. lib/lyman/conversation.rb)."
+      end
+
       def self.managed
         ARTIFACTS.select { |_, spec| spec[:role] == :managed }
       end

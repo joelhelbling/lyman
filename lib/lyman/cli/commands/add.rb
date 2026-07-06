@@ -12,10 +12,11 @@ module Lyman
           @source_root = source_root
         end
 
-        def call(name, force: false)
-          spec = Registry.fetch(name)
+        def call(artifact, force: false)
           project_root = Manifest.find!
           manifest = Manifest.load(project_root)
+          name = Registry.resolve(artifact, manifest: manifest)
+          spec = Registry.fetch(name)
           entry = manifest.artifact(name)
           dest = File.join(project_root, spec[:dest])
 
@@ -44,9 +45,13 @@ module Lyman
 
         def plant(manifest, name, spec, project_root)
           bytes = Planter.plant(name, spec, project_root: project_root, source_root: @source_root)
-          manifest.write_pristine(name, bytes)
+          manifest.write_pristine(spec[:dest], bytes)
 
-          attrs = {"status" => spec[:role].to_s, "planted_at" => Lyman::CLI::VERSION}
+          attrs = {
+            "status" => spec[:role].to_s,
+            "planted_at" => Lyman::CLI::VERSION,
+            "path" => spec[:dest]
+          }
           attrs["hash"] = Planter.hash(bytes) if spec[:role] == :managed
           manifest.set_artifact(name, attrs)
         end

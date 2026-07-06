@@ -12,17 +12,17 @@ module Lyman
           @source_root = source_root
         end
 
-        def call(name)
-          spec = Registry.fetch(name)
+        def call(artifact)
           project_root = Manifest.find!
           manifest = Manifest.load(project_root)
+          name = Registry.resolve(artifact, manifest: manifest)
           entry = manifest.artifact(name)
 
           case entry&.fetch("status", nil)
           when "managed"
             eject(manifest, name, entry)
           when "owned"
-            @thor.say "#{name} is already yours; lyman never manages #{spec[:dest]}."
+            @thor.say "#{name} is already yours; lyman never manages #{entry["path"]}."
           when "ejected"
             @thor.say "#{name} was already ejected at #{entry["ejected_at"]}; nothing to do."
           else
@@ -32,10 +32,14 @@ module Lyman
 
         private
 
+        # The tombstone keeps the path: it's what lets `diff` and `doctor`
+        # find the fork without consulting a registry that may no longer
+        # know this artifact.
         def eject(manifest, name, entry)
           manifest.set_artifact(name, {
             "status" => "ejected",
             "ejected_at" => Lyman::CLI::VERSION,
+            "path" => entry["path"],
             "pristine_hash" => entry["hash"]
           })
           manifest.save

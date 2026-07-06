@@ -40,7 +40,7 @@ module Lyman
         Commands::New.new(self, source_root: source_root).call(name)
       end
 
-      desc "add ARTIFACT", "Plant an artifact this project doesn't have yet"
+      desc "add ARTIFACT", "Plant an artifact (by name or path) this project doesn't have yet"
       method_option :force, type: :boolean, default: false,
         desc: "Skip the confirmation prompt when re-adding an ejected artifact, " \
           "or overwrite an untracked file at the destination"
@@ -53,12 +53,12 @@ module Lyman
         Commands::Update.new(self, source_root: source_root).call
       end
 
-      desc "eject ARTIFACT", "Take ownership of a managed artifact"
+      desc "eject ARTIFACT", "Take ownership of a managed artifact (by name or path)"
       def eject(artifact)
         Commands::Eject.new(self, source_root: source_root).call(artifact)
       end
 
-      desc "diff ARTIFACT", "Show local and upstream changes for an artifact"
+      desc "diff ARTIFACT", "Show local and upstream changes for an artifact (by name or path)"
       def diff(artifact)
         Commands::Diff.new(self, source_root: source_root).call(artifact)
       end
@@ -80,7 +80,7 @@ module Lyman
               entry ? entry["status"] : "not planted"
             end
 
-          line = "#{name} (#{spec[:role]})#{" — #{status}" if status} — #{spec[:description]}"
+          line = "#{name} (#{spec[:role]}) #{spec[:dest]}#{" — #{status}" if status} — #{spec[:description]}"
           say line
         end
       end

@@ -20,6 +20,7 @@ class NewTest < Minitest::Test
         entry = manifest.artifact(name)
         refute_nil entry, "expected manifest entry for #{name}"
         assert_equal spec[:role].to_s, entry["status"]
+        assert_equal spec[:dest], entry["path"]
       end
     end
   end
@@ -64,13 +65,13 @@ class NewTest < Minitest::Test
     end
   end
 
-  def test_pristine_copies_exist
+  def test_pristine_copies_mirror_planted_paths
     in_tmpdir do
       project = scaffold_project
       manifest = Lyman::CLI::Manifest.load(project)
 
-      Lyman::CLI::Registry::ARTIFACTS.each_key do |name|
-        assert manifest.pristine?(name), "expected pristine copy for #{name}"
+      Lyman::CLI::Registry::ARTIFACTS.each do |name, spec|
+        assert manifest.pristine?(spec[:dest]), "expected pristine copy for #{name} at #{spec[:dest]}"
       end
     end
   end

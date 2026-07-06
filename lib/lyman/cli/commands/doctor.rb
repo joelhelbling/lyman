@@ -49,15 +49,16 @@ module Lyman
 
         # Check 2: every manifest-listed file exists. Managed files also get
         # a pristine/modified note — modified is informational (that's
-        # `update`'s job to flag as a halt), not a doctor failure.
+        # `update`'s job to flag as a halt), not a doctor failure. Each entry
+        # records its own path, so this check needs no registry: even
+        # artifacts a future lyman release no longer knows about get checked.
         def check_files(manifest, project_root)
           ok = true
 
           manifest.artifacts.each do |name, entry|
-            spec = Registry::ARTIFACTS[name]
-            next unless spec # unknown-to-this-release entries: nothing to check against
+            next unless entry["path"] # nothing to check without a location
 
-            dest = File.join(project_root, spec[:dest])
+            dest = File.join(project_root, entry["path"])
             unless File.exist?(dest)
               report(false, "#{name}: planted file missing (#{dest})")
               ok = false
