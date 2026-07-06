@@ -1,3 +1,4 @@
 #!/usr/bin/env ruby
+
 require "lyman/cli"
 Lyman::CLI::Root.start

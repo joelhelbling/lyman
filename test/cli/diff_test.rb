@@ -48,6 +48,21 @@ class DiffTest < Minitest::Test
     end
   end
 
+  def test_accepts_a_path_in_place_of_a_name
+    in_tmpdir do
+      project = scaffold_project
+
+      Dir.chdir(project) do
+        File.write("lib/lyman/conversation.rb", "# hand-edited\n", mode: "a")
+
+        result = run_cli("diff", "./lib/lyman/conversation.rb")
+
+        assert_equal 0, result.status
+        assert_includes result.out, "hand-edited"
+      end
+    end
+  end
+
   private
 
   def split_sections(output)

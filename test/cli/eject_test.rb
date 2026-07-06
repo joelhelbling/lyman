@@ -17,6 +17,7 @@ class EjectTest < Minitest::Test
         assert_equal "ejected", entry["status"]
         assert_equal Lyman::CLI::VERSION, entry["ejected_at"]
         assert_equal hash_before, entry["pristine_hash"]
+        assert_equal "lib/lyman/conversation.rb", entry["path"]
       end
     end
   end
@@ -31,7 +32,7 @@ class EjectTest < Minitest::Test
         run_cli("eject", "conversation")
 
         manifest = Lyman::CLI::Manifest.load(Dir.pwd)
-        assert manifest.pristine?("conversation")
+        assert manifest.pristine?("lib/lyman/conversation.rb")
         assert_equal before, File.read("lib/lyman/conversation.rb")
       end
     end
@@ -75,6 +76,20 @@ class EjectTest < Minitest::Test
 
         assert_equal 0, result.status
         assert_includes result.out, "already ejected"
+      end
+    end
+  end
+
+  def test_accepts_a_path_in_place_of_a_name
+    in_tmpdir do
+      project = scaffold_project
+
+      Dir.chdir(project) do
+        result = run_cli("eject", "lib/lyman/conversation.rb")
+
+        assert_equal 0, result.status
+        manifest = Lyman::CLI::Manifest.load(Dir.pwd)
+        assert_equal "ejected", manifest.artifact("conversation")["status"]
       end
     end
   end

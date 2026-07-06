@@ -45,11 +45,22 @@ module Lyman
 
         private
 
+        # The manifest's recorded path — not the registry's dest — says where
+        # this project's copy lives; the registry only says where the current
+        # release would plant a fresh one. When the two disagree (someone
+        # moved the file, or upstream relocated the artifact), that's a halt:
+        # update can't know which references would break by moving it.
         def reconcile_managed(manifest, project_root, name, spec, entry, updated, up_to_date, halted)
-          dest = File.join(project_root, spec[:dest])
+          path = entry["path"]
+          dest = File.join(project_root, path)
+
+          if spec[:dest] != path
+            halted << {name: name, reason: :relocated, path: path, upstream_dest: spec[:dest]}
+            return
+          end
 
           unless File.exist?(dest)
-            halted << {name: name, reason: :missing, planted_at: entry["planted_at"]}
+            halted << {name: name, reason: :missing, planted_at: entry["planted_at"], path: path}
             return
           end
 
@@ -57,7 +68,7 @@ module Lyman
           current_hash = Planter.hash(current_bytes)
 
           if current_hash != entry["hash"]
-            halted << {name: name, reason: :modified, planted_at: entry["planted_at"]}
+            halted << {name: name, reason: :modified, planted_at: entry["planted_at"], path: path}
             return
           end
 
@@ -71,7 +82,7 @@ module Lyman
 
           from_version = entry["planted_at"]
           Planter.plant(name, spec, project_root: project_root, source_root: @source_root)
-          manifest.write_pristine(name, rendered)
+          manifest.write_pristine(path, rendered)
           manifest.set_artifact(name, entry.merge(
             "hash" => new_hash,
             "planted_at" => Lyman::CLI::VERSION
@@ -123,13 +134,18 @@ module Lyman
         def halt_message(halted)
           case halted[:reason]
           when :missing
-            "#{halted[:name]} (planted at #{halted[:planted_at]}) is missing its planted file; " \
-              "run `lyman add #{halted[:name]} --force` to replant it."
+            "#{halted[:name]} (planted at #{halted[:planted_at]}) is missing its planted file " \
+              "(#{halted[:path]}); run `lyman add #{halted[:name]} --force` to replant it."
           when :modified
             "#{halted[:name]} (planted at #{halted[:planted_at]}) has been modified since planting; " \
-              "pristine copy at .lyman/pristine/#{halted[:name]}. " \
+              "pristine copy at .lyman/pristine/#{halted[:path]}. " \
               "Run `lyman diff #{halted[:name]}` to see changes, or " \
               "`lyman eject #{halted[:name]}` to take ownership."
+          when :relocated
+            "#{halted[:name]} lives at #{halted[:path]} in this project, but this lyman release " \
+              "plants it at #{halted[:upstream_dest]}. Move the file (and any references to it), " \
+              "set its `path:` in .lyman/manifest.yml to match, and rerun `lyman update` — or " \
+              "run `lyman eject #{halted[:name]}` to keep it where it is, as yours."
           end
         end
       end

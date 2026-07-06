@@ -74,21 +74,24 @@ module Lyman
         self
       end
 
-      def pristine_path(name)
-        File.join(project_root, PRISTINE_DIR, name)
+      # The pristine cache mirrors the planted tree (.lyman/pristine/lib/
+      # lyman/conversation.rb, not a flat name) — collision-proof, and
+      # browsable as a shadow of exactly what was planted where.
+      def pristine_path(rel_path)
+        File.join(project_root, PRISTINE_DIR, rel_path)
       end
 
-      def write_pristine(name, bytes)
-        FileUtils.mkdir_p(File.join(project_root, PRISTINE_DIR))
-        File.write(pristine_path(name), bytes)
+      def write_pristine(rel_path, bytes)
+        FileUtils.mkdir_p(File.dirname(pristine_path(rel_path)))
+        File.write(pristine_path(rel_path), bytes)
       end
 
-      def read_pristine(name)
-        File.read(pristine_path(name))
+      def read_pristine(rel_path)
+        File.read(pristine_path(rel_path))
       end
 
-      def pristine?(name)
-        File.exist?(pristine_path(name))
+      def pristine?(rel_path)
+        File.exist?(pristine_path(rel_path))
       end
 
       private

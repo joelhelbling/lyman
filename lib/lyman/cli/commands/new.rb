@@ -37,11 +37,19 @@ module Lyman
             "choose a different name or clear the directory first."
         end
 
+        # The manifest records where each artifact was planted, so every
+        # entry stays self-describing even if a later lyman release renames
+        # or drops the artifact — lifecycle commands read the path from
+        # here, not from the registry.
         def plant(manifest, artifact_name, spec, project_root)
           bytes = Planter.plant(artifact_name, spec, project_root: project_root, source_root: @source_root)
-          manifest.write_pristine(artifact_name, bytes)
+          manifest.write_pristine(spec[:dest], bytes)
 
-          attrs = {"status" => spec[:role].to_s, "planted_at" => Lyman::CLI::VERSION}
+          attrs = {
+            "status" => spec[:role].to_s,
+            "planted_at" => Lyman::CLI::VERSION,
+            "path" => spec[:dest]
+          }
           attrs["hash"] = Planter.hash(bytes) if spec[:role] == :managed
           manifest.set_artifact(artifact_name, attrs)
         end

@@ -15,21 +15,23 @@ module Lyman
           @source_root = source_root
         end
 
-        def call(name)
-          spec = Registry.fetch(name)
+        def call(artifact)
           project_root = Manifest.find!
           manifest = Manifest.load(project_root)
+          name = Registry.resolve(artifact, manifest: manifest)
+          spec = Registry.fetch(name)
+          entry = manifest.artifact(name)
+          path = entry && entry["path"]
 
-          unless manifest.artifact(name) && manifest.pristine?(name)
-            raise Thor::Error, "#{name} has no pristine copy in this project " \
-              "(.lyman/pristine/#{name}); nothing to diff against."
+          unless path && manifest.pristine?(path)
+            raise Thor::Error, "#{name} has no pristine copy in this project; nothing to diff against."
           end
 
-          pristine_path = manifest.pristine_path(name)
-          dest = File.join(project_root, spec[:dest])
+          pristine_path = manifest.pristine_path(path)
+          dest = File.join(project_root, path)
 
           @thor.say "--- your changes (#{name}) ---"
-          @thor.say section(pristine_path, dest, "pristine/#{name}", spec[:dest])
+          @thor.say section(pristine_path, dest, "pristine/#{path}", path)
 
           @thor.say ""
           @thor.say "--- upstream changes since planted (#{name}) ---"
@@ -37,7 +39,7 @@ module Lyman
           Tempfile.create(name) do |upstream|
             upstream.write(rendered)
             upstream.flush
-            @thor.say section(pristine_path, upstream.path, "pristine/#{name}", "upstream/#{name}")
+            @thor.say section(pristine_path, upstream.path, "pristine/#{path}", "upstream/#{spec[:dest]}")
           end
         end
 

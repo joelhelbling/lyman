@@ -3,9 +3,9 @@ require_relative "../test_helper"
 class AddTest < Minitest::Test
   def test_unknown_artifact_lists_valid_names
     in_tmpdir do
-      scaffold_project
+      project = scaffold_project
 
-      result = run_cli("add", "nonexistent_artifact")
+      result = Dir.chdir(project) { run_cli("add", "nonexistent_artifact") }
 
       refute_equal 0, result.status
       Lyman::CLI::Registry::ARTIFACTS.each_key do |name|
