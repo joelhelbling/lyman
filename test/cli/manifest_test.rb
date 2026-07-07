@@ -8,7 +8,7 @@ class ManifestTest < Minitest::Test
       manifest.save
 
       reloaded = Lyman::CLI::Manifest.load(Dir.pwd)
-      assert_equal "0.1.0", reloaded.lyman_version
+      assert_equal Lyman::CLI::VERSION, reloaded.lyman_version
       assert_equal({"status" => "managed", "planted_at" => "0.1.0", "hash" => "abc"}, reloaded.artifact("conversation"))
     end
   end
