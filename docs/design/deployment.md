@@ -150,7 +150,12 @@ Three channels, ordered by reach:
    `AGENTS.md`) as a first-class artifact carrying the load-bearing facts: the
    nil-source footgun, the runaway-turn guard, item-as-control discipline,
    wire-vs-conversation separation. Highest-value channel: works with any
-   coding agent, zero install steps, travels with the code.
+   coding agent, zero install steps, travels with the code. For projects that
+   already have a `CLAUDE.md` lyman shouldn't clobber, the same guidance
+   ships as an opt-in Claude Code skill (`lyman add claude_skill` plants
+   `.claude/skills/lyman/SKILL.md`); `lyman add claude_md` points there when
+   it refuses to overwrite an existing file. Opt-in artifacts (`optional:` in
+   the registry) are skipped by `new` and reached with `add`.
 2. **A Claude plugin marketplace** in the `joelhelbling/lyman` repo, for
    richer *procedures* — e.g. a skill that knows how to wire a new tool worker
    correctly, or how to read a stalled pipeline. Skills earn their keep when

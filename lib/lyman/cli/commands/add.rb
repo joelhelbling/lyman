@@ -31,8 +31,13 @@ module Lyman
             end
           else
             if File.exist?(dest) && !force
-              raise Thor::Error, "#{dest} already exists and isn't tracked by lyman. " \
+              message = "#{dest} already exists and isn't tracked by lyman. " \
                 "Move it aside, or run `lyman add #{name} --force` to overwrite it."
+              if (alt = spec[:alternative])
+                message += " Or plant `lyman add #{alt}` instead, " \
+                  "which leaves #{spec[:dest]} untouched."
+              end
+              raise Thor::Error, message
             end
           end
 

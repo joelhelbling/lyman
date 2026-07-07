@@ -1,12 +1,26 @@
 require_relative "../test_helper"
 
 class NewTest < Minitest::Test
-  def test_plants_every_registry_artifact
+  def test_plants_every_default_registry_artifact
     in_tmpdir do
       project = scaffold_project
 
-      Lyman::CLI::Registry::ARTIFACTS.each_value do |spec|
+      Lyman::CLI::Registry.default.each_value do |spec|
         assert File.exist?(File.join(project, spec[:dest])), "expected #{spec[:dest]} to be planted"
+      end
+    end
+  end
+
+  def test_skips_optional_artifacts
+    in_tmpdir do
+      project = scaffold_project
+      manifest = Lyman::CLI::Manifest.load(project)
+
+      optional = Lyman::CLI::Registry::ARTIFACTS.select { |_, spec| spec[:optional] }
+      refute_empty optional, "expected at least one optional artifact in the registry"
+      optional.each do |name, spec|
+        refute File.exist?(File.join(project, spec[:dest])), "expected #{spec[:dest]} not to be planted"
+        assert_nil manifest.artifact(name)
       end
     end
   end
@@ -16,7 +30,7 @@ class NewTest < Minitest::Test
       project = scaffold_project
       manifest = Lyman::CLI::Manifest.load(project)
 
-      Lyman::CLI::Registry::ARTIFACTS.each do |name, spec|
+      Lyman::CLI::Registry.default.each do |name, spec|
         entry = manifest.artifact(name)
         refute_nil entry, "expected manifest entry for #{name}"
         assert_equal spec[:role].to_s, entry["status"]
@@ -57,7 +71,7 @@ class NewTest < Minitest::Test
     in_tmpdir do
       project = scaffold_project
 
-      Lyman::CLI::Registry::ARTIFACTS.each_value do |spec|
+      Lyman::CLI::Registry.default.each_value do |spec|
         next unless spec[:dest].end_with?(".rb")
         path = File.join(project, spec[:dest])
         assert RubyVM::InstructionSequence.compile(File.read(path)), "expected #{spec[:dest]} to parse"
@@ -70,7 +84,7 @@ class NewTest < Minitest::Test
       project = scaffold_project
       manifest = Lyman::CLI::Manifest.load(project)
 
-      Lyman::CLI::Registry::ARTIFACTS.each do |name, spec|
+      Lyman::CLI::Registry.default.each do |name, spec|
         assert manifest.pristine?(spec[:dest]), "expected pristine copy for #{name} at #{spec[:dest]}"
       end
     end

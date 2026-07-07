@@ -19,7 +19,7 @@ module Lyman
           FileUtils.mkdir_p(project_root)
 
           manifest = Manifest.load(project_root)
-          Registry::ARTIFACTS.each do |artifact_name, spec|
+          Registry.default.each do |artifact_name, spec|
             plant(manifest, artifact_name, spec, project_root)
           end
           manifest.save

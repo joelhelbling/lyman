@@ -42,7 +42,20 @@ module Lyman
           source: "templates/CLAUDE.md",
           dest: "CLAUDE.md",
           role: :owned,
+          alternative: "claude_skill",
           description: "Guidance for coding agents working in this project"
+        },
+        # The same guidance as claude_md, packaged as a Claude Code skill —
+        # for projects that already have a CLAUDE.md lyman shouldn't clobber.
+        # `optional:` keeps `new` from planting it (a fresh scaffold gets
+        # claude_md instead); `alternative:` on claude_md points here when
+        # `add` refuses to overwrite an existing CLAUDE.md.
+        "claude_skill" => {
+          source: "templates/SKILL.md",
+          dest: ".claude/skills/lyman/SKILL.md",
+          role: :owned,
+          optional: true,
+          description: "Claude Code skill variant of the CLAUDE.md guidance — for projects with their own CLAUDE.md"
         },
         "gemfile" => {
           source: "templates/Gemfile",
@@ -88,6 +101,13 @@ module Lyman
 
       def self.managed
         ARTIFACTS.select { |_, spec| spec[:role] == :managed }
+      end
+
+      # What `new` plants: everything except opt-in artifacts (those exist
+      # for situations a fresh scaffold can't be in, like a pre-existing
+      # CLAUDE.md — reach them with `lyman add`).
+      def self.default
+        ARTIFACTS.reject { |_, spec| spec[:optional] }
       end
 
       def self.source_path(spec, source_root: GEM_ROOT)

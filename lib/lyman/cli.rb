@@ -80,7 +80,8 @@ module Lyman
               entry ? entry["status"] : "not planted"
             end
 
-          line = "#{name} (#{spec[:role]}) #{spec[:dest]}#{" — #{status}" if status} — #{spec[:description]}"
+          role = "#{spec[:role]}#{", opt-in" if spec[:optional]}"
+          line = "#{name} (#{role}) #{spec[:dest]}#{" — #{status}" if status} — #{spec[:description]}"
           say line
         end
       end

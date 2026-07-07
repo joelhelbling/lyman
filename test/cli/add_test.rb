@@ -63,6 +63,41 @@ class AddTest < Minitest::Test
     end
   end
 
+  def test_add_plants_optional_claude_skill
+    in_tmpdir do
+      scaffold_project("demo")
+      Dir.chdir("demo") do
+        result = run_cli("add", "claude_skill")
+
+        assert_equal 0, result.status
+        skill = File.read(".claude/skills/lyman/SKILL.md")
+        assert_includes skill, "name: lyman"
+        manifest = Lyman::CLI::Manifest.load(Dir.pwd)
+        assert_equal "owned", manifest.artifact("claude_skill")["status"]
+        assert_equal ".claude/skills/lyman/SKILL.md", manifest.artifact("claude_skill")["path"]
+      end
+    end
+  end
+
+  def test_existing_claude_md_refusal_suggests_skill_variant
+    in_tmpdir do
+      scaffold_project("demo")
+      Dir.chdir("demo") do
+        manifest = Lyman::CLI::Manifest.load(Dir.pwd)
+        manifest.delete_artifact("claude_md")
+        manifest.save
+        # CLAUDE.md is on disk but untracked — the "project already had one"
+        # situation the skill variant exists for.
+        assert File.exist?("CLAUDE.md")
+
+        result = run_cli("add", "claude_md")
+
+        refute_equal 0, result.status
+        assert_includes result.err, "lyman add claude_skill"
+      end
+    end
+  end
+
   def test_readd_over_tombstone_prompts_and_force_restores_managed_status
     in_tmpdir do
       scaffold_project("demo")
