@@ -152,9 +152,15 @@ Early and moving. What exists today: the vision, circuit-pattern, and
 deployment design docs, the core `Conversation` item, chat-completion and
 tool-execution workers, a working tool-using chat harness against live local
 models, and the generator CLI (`new` / `add` / `update` / `eject` / `diff` /
-`doctor` / `list`) with a Minitest suite behind it. Not yet published to
-rubygems.org — for now, run it from a checkout. On deck: publishing the gem,
-tool-call fan-out, and a one-shot (non-REPL) harness.
+`doctor` / `list`) with a Minitest suite behind it. Published to
+[rubygems.org](https://rubygems.org/gems/lyman) — install it with:
+
+```sh
+gem install lyman
+lyman new my-agent
+```
+
+On deck: tool-call fan-out and a one-shot (non-REPL) harness.
 
 ## License
 
