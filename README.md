@@ -14,6 +14,8 @@ less margin for error than the frontier labs. Your one real edge is
 > series is also, fittingly, a sequence of discrete lines — like the stages of
 > a pipeline.
 
+![lyman new, then a first chat with a tool-using local model](demo/demo.gif)
+
 ## The idea
 
 An agent harness is a pipeline. Not as a metaphor — literally:
@@ -65,14 +67,19 @@ bundle exec ruby harness/chat.rb
 lyman ⇢ gemma4:latest @ http://localhost:11434/v1
 
 you> what time is it?
-  ⚙ current_time {}
 
-gemma4:latest> It's 9:25 PM on Friday, July 3rd.
+gemma4:latest> ✻ The user wants the current time. I have a current_time tool…
+
+  ⚙ current_time {}
+  ✓ current_time → 2026-07-08 18:13:29 EDT
+
+gemma4:latest> It's 6:13 PM on Wednesday, July 8th.
 ```
 
-That `⚙` line is a side worker showing you the model calling a tool — and the
-reply after it means two model round-trips completed inside a single pull on
-the pipeline. Point it elsewhere with `LYMAN_BASE_URL` and `LYMAN_MODEL`.
+The `✻` aside is a streamed preview of the model's thinking; the `⚙` and `✓`
+lines are side workers showing a tool call and its result — and the reply
+after them means two model round-trips completed inside a single pull on the
+pipeline. Point it elsewhere with `LYMAN_BASE_URL` and `LYMAN_MODEL`.
 
 ## How it works, briefly
 
