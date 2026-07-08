@@ -7,8 +7,9 @@ against any OpenAI-compatible chat completions endpoint (Ollama by default).
 
 ## Running it
 
-- `bundle install` — install dependencies (just `shifty` and `ostruct`; this
-  project has no runtime dependency on the `lyman` gem itself).
+- `bundle install` — install dependencies (`shifty`, `ostruct`, and `cli-ui`
+  for the harness's display layer; this project has no runtime dependency on
+  the `lyman` gem itself).
 - `ruby harness/chat.rb` — run the interactive chat harness. Defaults to
   Ollama at `http://localhost:11434/v1`; override with `LYMAN_MODEL` and
   `LYMAN_BASE_URL` env vars.

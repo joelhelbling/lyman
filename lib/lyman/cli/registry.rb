@@ -61,7 +61,7 @@ module Lyman
           source: "templates/Gemfile",
           dest: "Gemfile",
           role: :owned,
-          description: "Client dependencies: shifty (and ostruct for ruby >= 4)"
+          description: "Client dependencies: shifty (plus ostruct for ruby >= 4, cli-ui for the harness display)"
         },
         "gitignore" => {
           source: "templates/gitignore",
