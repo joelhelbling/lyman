@@ -38,6 +38,38 @@ module Lyman
           role: :owned,
           description: "The wiring script — yours from day one; lyman never updates it"
         },
+        # The harness's display layer, one artifact per widget so ownership —
+        # and any drift `lyman diff` reports — stays per-file, not per-blob.
+        "chat_style" => {
+          source: "harness/chat/style.rb",
+          dest: "harness/chat/style.rb",
+          role: :owned,
+          description: "Terminal styling codes and the gray() helper shared by the chat display"
+        },
+        "think_filter" => {
+          source: "harness/chat/think_filter.rb",
+          dest: "harness/chat/think_filter.rb",
+          role: :owned,
+          description: "Streams a dim preview of <think> blocks, then elides the rest"
+        },
+        "wait_spinner" => {
+          source: "harness/chat/wait_spinner.rb",
+          dest: "harness/chat/wait_spinner.rb",
+          role: :owned,
+          description: "Background spinner for the silence before the first streamed token"
+        },
+        "round_printer" => {
+          source: "harness/chat/round_printer.rb",
+          dest: "harness/chat/round_printer.rb",
+          role: :owned,
+          description: "Streams one round to the terminal: spinner, model label, think preview, reply"
+        },
+        "tool_printer" => {
+          source: "harness/chat/tool_printer.rb",
+          dest: "harness/chat/tool_printer.rb",
+          role: :owned,
+          description: "Prints tool calls on the way in, summarized results on the way out"
+        },
         "claude_md" => {
           source: "templates/CLAUDE.md",
           dest: "CLAUDE.md",

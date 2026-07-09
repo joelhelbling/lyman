@@ -46,7 +46,11 @@ source of truth for intent; this file is a summary plus working conventions.
   `lib/lyman.rb` entry point).
 - `harness/chat.rb` — the shipped example harness: the one legible wiring
   script. It is a deliberately top-level Ruby script, not a class — and it is
-  the source planted by `lyman new`, owned by the user from day one.
+  the source planted by `lyman new`, owned by the user from day one. Its
+  display layer (styling, think-preview filter, spinner, printers) lives in
+  `harness/chat/`, one file per widget, each registered as its own owned
+  artifact. The harness loads local files with `require_relative` — it uses
+  the files in `lib/`, not the lyman gem.
 - `test/` — Minitest suite for the generator CLI.
 - `docs/` — vision and design notes. Design decisions get written down here.
 
