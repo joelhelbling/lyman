@@ -8,8 +8,8 @@ module Lyman
     extend Shifty::DSL
 
     # Relay worker: sends the conversation to an OpenAI-compatible chat
-    # completions endpoint and appends the assistant's reply (which may
-    # include tool calls). Increments the conversation's round counter.
+    # completions endpoint and hands off a new conversation with the
+    # assistant's reply (which may include tool calls) appended.
     #
     # Pass an on_delta callable to stream: it receives each content
     # fragment as it arrives. The worker still returns the conversation
@@ -42,9 +42,7 @@ module Lyman
             fetch_message(http, uri, payload)
           end
 
-        conversation.add_assistant_message(message)
-        conversation.rounds += 1
-        conversation
+        conversation.with_assistant_message(message)
       end
     end
 

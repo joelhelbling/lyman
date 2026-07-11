@@ -3,63 +3,64 @@ module Lyman
   # conversation so far, plus the control data workers consult to decide
   # *whether* to act (never *which of several things* to do).
   #
+  # An immutable value. Shifty 0.6 deep-freezes every value at a worker
+  # boundary (the :frozen handoff policy), so change is expressed as new
+  # values: each with_* method returns a new Conversation and leaves the
+  # receiver untouched. Data#with structurally shares the unchanged
+  # members — safe precisely because handed-off values are frozen.
+  #
   # Messages use string keys throughout, for clean round-tripping with
   # OpenAI-compatible wire formats.
-  class Conversation
-    attr_reader :messages
-    attr_accessor :rounds, :max_rounds
-
-    def initialize(system_prompt: nil, max_rounds: 10)
-      @messages = []
-      @messages << {"role" => "system", "content" => system_prompt} if system_prompt
-      @rounds = 0
-      @max_rounds = max_rounds
-      @finished = false
+  class Conversation < Data.define(:messages, :rounds, :max_rounds, :finished)
+    def initialize(system_prompt: nil, messages: nil, rounds: 0, max_rounds: 10, finished: false)
+      messages ||= system_prompt ? [{"role" => "system", "content" => system_prompt}] : []
+      super(messages: messages, rounds: rounds, max_rounds: max_rounds, finished: finished)
     end
 
-    def add_user_message(text)
-      @messages << {"role" => "user", "content" => text}
-      @finished = false
-      @rounds = 0
-      self
+    def with_user_message(text)
+      with(
+        messages: messages + [{"role" => "user", "content" => text}],
+        rounds: 0,
+        finished: false
+      )
     end
 
-    def add_assistant_message(message)
-      @messages << message
-      self
+    # A round *is* one model reply, so the counter lives here rather than
+    # in the transport worker — swap the transport and the runaway guard
+    # still can't be forgotten.
+    def with_assistant_message(message)
+      with(messages: messages + [message], rounds: rounds + 1)
     end
 
-    def add_tool_result(tool_call_id, content)
-      @messages << {
+    def with_tool_result(tool_call_id, content)
+      with(messages: messages + [{
         "role" => "tool",
         "tool_call_id" => tool_call_id,
         "content" => content
-      }
-      self
+      }])
     end
 
     def pending_tool_calls
-      last = @messages.last
+      last = messages.last
       return [] unless last && last["role"] == "assistant"
       last["tool_calls"] || []
     end
 
     def last_assistant_content
-      message = @messages.rfind { |m| m["role"] == "assistant" }
+      message = messages.rfind { |m| m["role"] == "assistant" }
       message && message["content"]
     end
 
-    def finish!
-      @finished = true
-      self
+    def finish
+      with(finished: true)
     end
 
     def finished?
-      @finished
+      finished
     end
 
     def runaway?
-      @rounds >= @max_rounds
+      rounds >= max_rounds
     end
   end
 end

@@ -27,7 +27,10 @@ Gem::Specification.new do |spec|
   spec.executables = ["lyman"]
   spec.require_paths = ["lib"]
 
-  spec.add_dependency "shifty"
+  # 0.6 is shifty's handoff-immutability release — values are deeply frozen
+  # at worker boundaries — and the planted Conversation and workers are
+  # written for that world.
+  spec.add_dependency "shifty", "~> 0.6"
   spec.add_dependency "ostruct" # shifty dependency; no longer a default gem in ruby 4
   spec.add_dependency "thor"
 end

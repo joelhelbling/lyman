@@ -20,13 +20,14 @@ require "./lib/lyman"
 include Shifty::DSL # standard:disable Style/MixinUsage
 
 conversation = Lyman::Conversation.new(system_prompt: "doctor")
-conversation.add_user_message("ping the tool once, then answer")
+  .with_user_message("ping the tool once, then answer")
 rounds = [] # the circuit's queue, shell scope — mirrors harness/chat.rb
 
 # Stands in for Lyman::Workers.chat_completion: round 1 calls the "ping"
 # tool, round 2 answers plainly. A real transport wouldn't know the round
 # count in advance, but the seam only cares that something plays by the
-# wire's rules — append an assistant message, bump the round counter.
+# wire's rules — hand off a new conversation with the assistant message
+# appended (with_assistant_message also counts the round).
 call_count = 0
 stub_transport = relay_worker do |c|
   call_count += 1
@@ -46,17 +47,14 @@ stub_transport = relay_worker do |c|
     else
       {"role" => "assistant", "content" => "done"}
     end
-  c.add_assistant_message(message)
-  c.rounds += 1
-  c
+  c.with_assistant_message(message)
 end
 
 pipeline =
   source_worker { rounds.shift } |
   stub_transport |
   relay_worker { |c|
-    c.finish! if c.pending_tool_calls.empty? || c.runaway?
-    c
+    (c.pending_tool_calls.empty? || c.runaway?) ? c.finish : c
   } |
   Lyman::Workers.tool_execution({"ping" => ->(_) { "pong" }}) |
   side_worker { |c| rounds << c unless c.finished? } |

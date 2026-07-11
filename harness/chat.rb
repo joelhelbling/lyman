@@ -70,8 +70,7 @@ pipeline =
   ) |
   side_worker { |_c| printer.finish_round } |
   relay_worker { |c|
-    c.finish! if c.pending_tool_calls.empty? || c.runaway?
-    c
+    (c.pending_tool_calls.empty? || c.runaway?) ? c.finish : c
   } |
   side_worker { |c| tool_printer.calls(c) unless c.finished? } |
   Lyman::Workers.tool_execution(handlers) |
@@ -105,6 +104,9 @@ loop do
   end
   break if input.nil? || input.empty?
 
-  rounds << conversation.add_user_message(input)
-  pipeline.shift
+  # Conversation is an immutable value (shifty 0.6 freezes every handoff),
+  # so state flows in the open: enqueue a new conversation carrying the
+  # user's message, and rebind to the finished turn the circuit hands back.
+  rounds << conversation.with_user_message(input)
+  conversation = pipeline.shift
 end
