@@ -84,6 +84,13 @@ Concrete consequences:
 
 ## Sharp edges to respect
 
+- **Frozen handoffs:** shifty 0.6's default handoff policy deep-freezes every
+  value at a worker boundary (`Ractor.make_shareable`); a task that mutates
+  its input raises `Shifty::PolicyViolation`. `Conversation` is therefore an
+  immutable value — express change with its `with_*` methods (a new
+  conversation comes back) and rebind shell state to what the pipeline
+  returns. Closure state inside a worker stays freely mutable; only
+  handed-off values freeze. See `docs/design/immutable-conversation.md`.
 - **The nil footgun:** in shifty, a source returning `nil` ends the stream
   permanently. The circuit's queue-backed source must never be pulled while the
   queue is empty — the shell enqueues before shifting.

@@ -24,7 +24,7 @@ An agent harness is a pipeline. Not as a metaphor — literally:
 pipeline =
   source_worker { rounds.shift }                                             |
   Lyman::Workers.chat_completion(base_url:, model:, tools:)                  |
-  relay_worker { |c| c.finish! if c.pending_tool_calls.empty?; c }           |
+  relay_worker { |c| c.pending_tool_calls.empty? ? c.finish : c }            |
   Lyman::Workers.tool_execution(handlers)                                    |
   side_worker { |c| rounds << c unless c.finished? }                         |
   filter_worker { |c| c.finished? }

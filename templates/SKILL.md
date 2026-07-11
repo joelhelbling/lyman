@@ -32,23 +32,30 @@ you've ejected; commit it.
 day one, never touched by `lyman update`. Put your own workers in your own
 namespace or directory, not inside `lib/lyman/`.
 
-## Four load-bearing facts
+## Five load-bearing facts
 
-1. **The nil-source footgun.** In shifty, a source returning `nil` ends the
+1. **Frozen handoffs.** Shifty (0.6+) deep-freezes every value at a worker
+   boundary; a task that mutates its input raises `Shifty::PolicyViolation`.
+   `Conversation` is an immutable value: express change with its `with_*`
+   methods (a new conversation comes back) and rebind shell state to what
+   the pipeline returns — never mutate in place. Closure state inside a
+   worker stays freely mutable; only handed-off values freeze.
+
+2. **The nil-source footgun.** In shifty, a source returning `nil` ends the
    stream permanently. If you're driving a pipeline off a queue, enqueue
    before you shift — never pull a source worker while its queue is empty.
 
-2. **The runaway-turn guard.** The model⇄tool circuit is bounded by
+3. **The runaway-turn guard.** The model⇄tool circuit is bounded by
    `Conversation#runaway?` / `max_rounds`. Keep that guard intact when
    rewiring the circuit; without it, a model that keeps calling tools never
    lets a turn end.
 
-3. **Item-as-control discipline.** An item may tell a worker *whether* to
+4. **Item-as-control discipline.** An item may tell a worker *whether* to
    act, never *which of several things* to do. A worker that switches
    between jobs based on item state is the anti-pattern to avoid
    (multi-way dispatch) — split it into stages, or use a splitter, instead.
 
-4. **Wire vs. conversation.** Reasoning/thinking content stays on messages in
+5. **Wire vs. conversation.** Reasoning/thinking content stays on messages in
    the `Conversation` for observability, but `Workers.wire_messages` strips
    it before anything goes out over the wire. Preserve that separation if
    you touch message handling.
