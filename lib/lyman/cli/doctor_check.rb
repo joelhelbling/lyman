@@ -6,7 +6,7 @@
 # process's own, and it's the client's bundle — not the CLI's — that needs
 # to resolve shifty).
 #
-# Wires the same circuit shape as harness/chat.rb (docs/design/
+# Wires the same circuit shape as harness/repl.rb (docs/design/
 # circuit-pattern.md): a queue-backed source, the model⇄tool round, the
 # finish/requeue plumbing. The only substitution is the transport: a stub
 # stands in at the chat_completion seam. That's legitimate, not a mock
@@ -21,7 +21,7 @@ include Shifty::DSL # standard:disable Style/MixinUsage
 
 conversation = Lyman::Conversation.new(system_prompt: "doctor")
   .with_user_message("ping the tool once, then answer")
-rounds = [] # the circuit's queue, shell scope — mirrors harness/chat.rb
+rounds = [] # the circuit's queue, shell scope — mirrors harness/repl.rb
 
 # Stands in for Lyman::Workers.chat_completion: round 1 calls the "ping"
 # tool, round 2 answers plainly. A real transport wouldn't know the round

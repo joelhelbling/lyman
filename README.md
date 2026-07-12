@@ -30,7 +30,7 @@ pipeline =
   filter_worker { |c| c.finished? }
 ```
 
-That's not pseudocode — it's the working heart of [`harness/chat.rb`](harness/chat.rb),
+That's not pseudocode — it's the working heart of [`harness/repl.rb`](harness/repl.rb),
 a tool-using chat agent for local models. Every stage is a plain
 [shifty](https://github.com/joelhelbling/shifty) worker. Want logging? Splice
 in a `side_worker` — anywhere. Want a guardrail? A `filter_worker`. Want to
@@ -60,7 +60,7 @@ support (e.g. `qwen3.5`, `gemma4`, `mistral`).
 
 ```sh
 bundle install
-bundle exec ruby harness/chat.rb
+bundle exec ruby harness/repl.rb
 ```
 
 ```
@@ -91,6 +91,11 @@ pipeline. Point it elsewhere with `LYMAN_BASE_URL` and `LYMAN_MODEL`.
   state plus a process: the conversation, a queue, and a deliberately boring
   loop. A human REPL is one shell; an autonomous email-triager is another.
   Lyman is turn-shaped, not chat-shaped.
+- **Three archetype harnesses prove it.** The same circuit ships inside
+  three shells: a **repl** (a human drives the loop), a **daemon** (loop
+  forever on an inbound event stream), and a **script** (take one work item
+  at launch, process it, halt). Only the shell differs — see
+  [docs/design/harness-archetypes.md](docs/design/harness-archetypes.md).
 - **The agentic loop is a circuit, not a special construct.** Shifty pipelines
   are strictly linear, so the model⇄tool cycle is built from stock parts: a
   source reading from a queue, a side worker re-enqueueing unfinished rounds,
@@ -155,11 +160,12 @@ touched at all: it's yours from day one.
 
 ## Status
 
-Early and moving. What exists today: the vision, circuit-pattern, and
-deployment design docs, the core `Conversation` item, chat-completion and
-tool-execution workers, a working tool-using chat harness against live local
-models, and the generator CLI (`new` / `add` / `update` / `eject` / `diff` /
-`doctor` / `list`) with a Minitest suite behind it. Published to
+Early and moving. What exists today: the vision, circuit-pattern,
+harness-archetypes, and deployment design docs, the core `Conversation` item,
+chat-completion and tool-execution workers, the three archetype harnesses
+(repl, daemon, script) working against live local models, and the generator
+CLI (`new` / `add` / `update` / `eject` / `diff` / `doctor` / `list`) with a
+Minitest suite behind it. Published to
 [rubygems.org](https://rubygems.org/gems/lyman) — install it with:
 
 ```sh
@@ -167,7 +173,7 @@ gem install lyman
 lyman new my-agent
 ```
 
-On deck: tool-call fan-out and a one-shot (non-REPL) harness.
+On deck: tool-call fan-out.
 
 ## License
 

@@ -58,7 +58,7 @@ class EjectTest < Minitest::Test
       project = scaffold_project
 
       Dir.chdir(project) do
-        result = run_cli("eject", "harness")
+        result = run_cli("eject", "repl_harness")
 
         assert_equal 0, result.status
         assert_includes result.out, "already yours"

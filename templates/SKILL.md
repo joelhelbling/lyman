@@ -1,22 +1,40 @@
 ---
 name: lyman
-description: Guidance for working in a lyman-scaffolded agentic harness — the pipeline-of-workers model, the managed/owned boundary, and lyman's sharp edges. Use when reading or changing the harness (harness/chat.rb), anything under lib/lyman/, or when running lyman CLI commands (add, update, eject, diff, doctor).
+description: Guidance for working in a lyman-scaffolded agentic harness — the pipeline-of-workers model, the harness archetypes, the managed/owned boundary, and lyman's sharp edges. Use when reading or changing a harness script (harness/*.rb), anything under lib/lyman/, or when running lyman CLI commands (add, update, eject, diff, doctor).
 ---
 
 # Working in a lyman project
 
 This project was scaffolded by [lyman](https://github.com/joelhelbling/lyman):
 an agentic harness built on the [shifty](https://github.com/joelhelbling/shifty)
-gem's pipeline-of-workers model. `harness/chat.rb` wires a model⇄tool loop
+gem's pipeline-of-workers model. `harness/repl.rb` wires a model⇄tool loop
 against any OpenAI-compatible chat completions endpoint (Ollama by default).
 
 ## Running it
 
 - `bundle install` — install dependencies (just `shifty` and `ostruct`; this
   project has no runtime dependency on the `lyman` gem itself).
-- `ruby harness/chat.rb` — run the interactive chat harness. Defaults to
+- `ruby harness/repl.rb` — run the interactive repl harness. Defaults to
   Ollama at `http://localhost:11434/v1`; override with `LYMAN_MODEL` and
   `LYMAN_BASE_URL` env vars.
+
+## Harness archetypes
+
+Every lyman harness is the same model⇄tool circuit inside a different
+*shell* (state + a driving process). Three archetypes cover the shell
+shapes — see the [Harness Archetypes wiki page](https://github.com/joelhelbling/lyman/wiki/Harness-Archetypes):
+
+- **REPL** (`harness/repl.rb`, planted by default) — a human drives the
+  loop and ends it. One conversation accretes across turns.
+- **Daemon** (`lyman add daemon_harness`) — launch once, loop indefinitely
+  on an inbound event stream; no human in the loop. Fresh conversation per
+  event.
+- **Script** (`lyman add script_harness`) — launched by cron or on demand
+  with its work item in hand; processes it and halts. No loop in the shell
+  at all.
+
+To build a new harness, start from the archetype whose shell shape matches
+— the circuit rarely needs to change; the supplier of work items does.
 
 ## The managed/owned boundary
 
@@ -28,9 +46,9 @@ which takes ownership explicitly rather than leaving it silently forked.
 `.lyman/manifest.yml` is the record of what's managed, what's owned, and what
 you've ejected; commit it.
 
-`harness/chat.rb` and everything outside `Lyman::` is **owned** — yours from
-day one, never touched by `lyman update`. Put your own workers in your own
-namespace or directory, not inside `lib/lyman/`.
+The harness scripts (`harness/*.rb`) and everything outside `Lyman::` are
+**owned** — yours from day one, never touched by `lyman update`. Put your own
+workers in your own namespace or directory, not inside `lib/lyman/`.
 
 ## Five load-bearing facts
 

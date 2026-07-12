@@ -32,41 +32,60 @@ module Lyman
           role: :managed,
           description: "Relay worker: executes pending tool calls"
         },
-        "harness" => {
-          source: "harness/chat.rb",
-          dest: "harness/chat.rb",
+        # The three harness archetypes (docs/design/harness-archetypes.md):
+        # same circuit, different shells. `new` plants the repl — the
+        # archetype you can talk to on day one; the other two are opt-in
+        # (`lyman add daemon_harness` / `lyman add script_harness`) because a
+        # narrow, purpose-built agent wants one shell shape, not three.
+        "repl_harness" => {
+          source: "harness/repl.rb",
+          dest: "harness/repl.rb",
           role: :owned,
-          description: "The wiring script — yours from day one; lyman never updates it"
+          description: "The REPL archetype: a human drives the loop — yours from day one; lyman never updates it"
         },
-        # The harness's display layer, one artifact per widget so ownership —
-        # and any drift `lyman diff` reports — stays per-file, not per-blob.
-        "chat_style" => {
-          source: "harness/chat/style.rb",
-          dest: "harness/chat/style.rb",
+        "daemon_harness" => {
+          source: "harness/daemon.rb",
+          dest: "harness/daemon.rb",
           role: :owned,
-          description: "Terminal styling codes and the gray() helper shared by the chat display"
+          optional: true,
+          description: "The daemon archetype: launch once, loop on an inbound event stream indefinitely"
+        },
+        "script_harness" => {
+          source: "harness/script.rb",
+          dest: "harness/script.rb",
+          role: :owned,
+          optional: true,
+          description: "The script archetype: take one work item at launch, process it, halt"
+        },
+        # The repl's display layer, one artifact per widget so ownership —
+        # and any drift `lyman diff` reports — stays per-file, not per-blob.
+        "repl_style" => {
+          source: "harness/repl/style.rb",
+          dest: "harness/repl/style.rb",
+          role: :owned,
+          description: "Terminal styling codes and the gray() helper shared by the repl display"
         },
         "think_filter" => {
-          source: "harness/chat/think_filter.rb",
-          dest: "harness/chat/think_filter.rb",
+          source: "harness/repl/think_filter.rb",
+          dest: "harness/repl/think_filter.rb",
           role: :owned,
           description: "Streams a dim preview of <think> blocks, then elides the rest"
         },
         "wait_spinner" => {
-          source: "harness/chat/wait_spinner.rb",
-          dest: "harness/chat/wait_spinner.rb",
+          source: "harness/repl/wait_spinner.rb",
+          dest: "harness/repl/wait_spinner.rb",
           role: :owned,
           description: "Background spinner for the silence before the first streamed token"
         },
         "round_printer" => {
-          source: "harness/chat/round_printer.rb",
-          dest: "harness/chat/round_printer.rb",
+          source: "harness/repl/round_printer.rb",
+          dest: "harness/repl/round_printer.rb",
           role: :owned,
           description: "Streams one round to the terminal: spinner, model label, think preview, reply"
         },
         "tool_printer" => {
-          source: "harness/chat/tool_printer.rb",
-          dest: "harness/chat/tool_printer.rb",
+          source: "harness/repl/tool_printer.rb",
+          dest: "harness/repl/tool_printer.rb",
           role: :owned,
           description: "Prints tool calls on the way in, summarized results on the way out"
         },
@@ -135,9 +154,9 @@ module Lyman
         ARTIFACTS.select { |_, spec| spec[:role] == :managed }
       end
 
-      # What `new` plants: everything except opt-in artifacts (those exist
-      # for situations a fresh scaffold can't be in, like a pre-existing
-      # CLAUDE.md — reach them with `lyman add`).
+      # What `new` plants: everything except opt-in artifacts — alternates a
+      # fresh scaffold shouldn't presume (the daemon and script archetypes,
+      # the skill variant of CLAUDE.md). Reach them with `lyman add`.
       def self.default
         ARTIFACTS.reject { |_, spec| spec[:optional] }
       end

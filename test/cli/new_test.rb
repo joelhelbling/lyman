@@ -60,7 +60,7 @@ class NewTest < Minitest::Test
         assert_includes content, "Managed by lyman", "expected banner in #{spec[:dest]}"
       end
 
-      %w[harness/chat.rb CLAUDE.md].each do |owned_dest|
+      %w[harness/repl.rb CLAUDE.md].each do |owned_dest|
         content = File.read(File.join(project, owned_dest))
         refute_includes content, "Managed by lyman", "expected no banner in #{owned_dest}"
       end
