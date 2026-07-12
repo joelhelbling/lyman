@@ -7,9 +7,10 @@ agentic workflows on local/open-weight models, where fast iteration is the edge.
 
 Read `docs/vision.md` (the why, the values, the architecture decisions),
 `docs/design/circuit-pattern.md` (how the model⇄tool loop works in a linear
-pull pipeline), and `docs/design/deployment.md` (lyman as a pure generator:
-manifest-tracked planted modules, eject-to-own, unit of upgrade = unit of
-extraction) before making design-level changes. Those documents are the
+pull pipeline), `docs/design/harness-archetypes.md` (the repl/daemon/script
+trifecta: one circuit, three shells), and `docs/design/deployment.md` (lyman
+as a pure generator: manifest-tracked planted modules, eject-to-own, unit of
+upgrade = unit of extraction) before making design-level changes. Those documents are the
 source of truth for intent; this file is a summary plus working conventions.
 
 ## Commands
@@ -22,10 +23,13 @@ source of truth for intent; this file is a summary plus working conventions.
   genuinely warranted (rare), scope it to the line and add a comment saying why.
 - `bundle exec rake test` — run the Minitest suite (it covers the generator
   CLI; tests drive observable behavior — CLI in, files/manifest/output out).
-- `ruby harness/chat.rb` — run the interactive chat harness against a local
+- `ruby harness/repl.rb` — run the interactive repl harness against a local
   OpenAI-compatible endpoint (defaults: Ollama at `http://localhost:11434/v1`,
   model `gemma4:latest`; override with `LYMAN_MODEL` / `LYMAN_BASE_URL`).
   Verifying behavior end-to-end requires a local model server to be running.
+  `ruby harness/script.rb "some task"` and `ruby harness/daemon.rb` (answers
+  line-per-event on TCP port 1216; try `echo hi | nc localhost 1216`) exercise
+  the other two archetypes against the same endpoint.
 - `bundle exec exe/lyman` — the generator CLI (`new` / `add` / `update` /
   `eject` / `diff` / `doctor` / `list`). `LYMAN_SOURCE_ROOT` points it at an
   alternate artifact-source tree — how tests simulate a newer lyman release.
@@ -44,13 +48,16 @@ source of truth for intent; this file is a summary plus working conventions.
 - `templates/` — plantable artifacts that aren't this repo's own working
   files (the client `CLAUDE.md` and `Gemfile`, the glob-based client
   `lib/lyman.rb` entry point).
-- `harness/chat.rb` — the shipped example harness: the one legible wiring
-  script. It is a deliberately top-level Ruby script, not a class — and it is
-  the source planted by `lyman new`, owned by the user from day one. Its
+- `harness/` — the three archetype harnesses (`repl.rb`, `daemon.rb`,
+  `script.rb`): one circuit, three shells — see
+  `docs/design/harness-archetypes.md`. Each is a deliberately top-level Ruby
+  wiring script, not a class, owned by the user from day one (`lyman new`
+  plants the repl; the other two are opt-in via `lyman add`). The repl's
   display layer (styling, think-preview filter, spinner, printers) lives in
-  `harness/chat/`, one file per widget, each registered as its own owned
-  artifact. The harness loads local files with `require_relative` — it uses
-  the files in `lib/`, not the lyman gem.
+  `harness/repl/`, one file per widget, each registered as its own owned
+  artifact; the daemon and script stay stdlib-only. Harnesses load local
+  files with `require_relative` — they use the files in `lib/`, not the
+  lyman gem.
 - `test/` — Minitest suite for the generator CLI.
 - `docs/` — vision and design notes. Design decisions get written down here.
 
@@ -66,7 +73,7 @@ source of truth for intent; this file is a summary plus working conventions.
 
 Concrete consequences:
 
-- **The shell stays boring.** The enclosing scope (e.g. `harness/chat.rb`'s
+- **The shell stays boring.** The enclosing scope (e.g. `harness/repl.rb`'s
   loop) is state + a driving process, nothing more. If a shell is getting
   interesting, the interesting part belongs in a worker.
 - **State lives in the shell's scope, visibly** — the conversation and the

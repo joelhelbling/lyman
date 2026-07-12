@@ -1,5 +1,9 @@
 #!/usr/bin/env ruby
 #
+# The REPL archetype: a human drives the loop and decides when it ends.
+# One of three archetype shells — repl, daemon, script — around the same
+# circuit; see docs/design/harness-archetypes.md.
+#
 # The shell: state + a process. Deliberately boring.
 #
 # This file is the one legible wiring script — the circuit pattern from
@@ -9,7 +13,7 @@
 # Everything the model does streams to the terminal as it happens —
 # pre-tool narration, tool calls, the final answer. Fitting the display
 # to the model (like hiding a <think> block) is this shell's job, not
-# the library's — the harness/chat/ files are that display layer. Their
+# the library's — the harness/repl/ files are that display layer. Their
 # dependencies (cli-ui for color and glyphs, reline for prompt
 # line-editing and history) stay out of the circuit; restyle or delete
 # them freely.
@@ -17,9 +21,9 @@
 # require_relative, not the load path: these are files planted beside this
 # script, not the lyman gem.
 require_relative "../lib/lyman"
-require_relative "chat/style"
-require_relative "chat/round_printer"
-require_relative "chat/tool_printer"
+require_relative "repl/style"
+require_relative "repl/round_printer"
+require_relative "repl/tool_printer"
 require "cli/ui"
 require "reline"
 

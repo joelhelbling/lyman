@@ -98,6 +98,32 @@ class AddTest < Minitest::Test
     end
   end
 
+  def test_add_plants_optional_archetype_harnesses
+    in_tmpdir do
+      scaffold_project("demo")
+      Dir.chdir("demo") do
+        # A fresh scaffold gets only the repl archetype.
+        assert File.exist?("harness/repl.rb")
+        refute File.exist?("harness/daemon.rb")
+        refute File.exist?("harness/script.rb")
+
+        %w[daemon_harness script_harness].each do |name|
+          result = run_cli("add", name)
+
+          assert_equal 0, result.status
+          manifest = Lyman::CLI::Manifest.load(Dir.pwd)
+          assert_equal "owned", manifest.artifact(name)["status"]
+        end
+
+        %w[harness/daemon.rb harness/script.rb].each do |dest|
+          source = File.read(dest)
+          assert RubyVM::InstructionSequence.compile(source), "expected #{dest} to parse"
+          refute_includes source, "Managed by lyman", "expected no banner in #{dest}"
+        end
+      end
+    end
+  end
+
   def test_readd_over_tombstone_prompts_and_force_restores_managed_status
     in_tmpdir do
       scaffold_project("demo")

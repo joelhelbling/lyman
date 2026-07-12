@@ -62,8 +62,11 @@ module Lyman
             Next steps:
               cd #{name}
               bundle install
-              ruby harness/chat.rb   # defaults to Ollama at http://localhost:11434/v1
+              ruby harness/repl.rb   # defaults to Ollama at http://localhost:11434/v1
               lyman doctor           # smoke-test the pipeline
+
+            The repl is one of three harness archetypes; the other two are a
+            `lyman add` away (daemon_harness, script_harness).
           EPILOGUE
         end
       end

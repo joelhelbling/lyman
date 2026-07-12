@@ -1,4 +1,4 @@
-# Demo for the lyman README: scaffold a project, run the chat harness,
+# Demo for the lyman README: scaffold a project, run the repl harness,
 # watch a model⇄tool round stream by. Requires vhs (brew install vhs),
 # Ollama running locally with the default model pulled, and the lyman
 # gem installed. Record from an empty scratch directory (`lyman new`
@@ -23,7 +23,7 @@ Type "cd time-teller && bundle install"
 Enter
 Sleep 5s
 
-Type "ruby harness/chat.rb"
+Type "ruby harness/repl.rb"
 Enter
 Sleep 2s
 
