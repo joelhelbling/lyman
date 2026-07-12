@@ -120,3 +120,12 @@ Concrete consequences:
   worker interactions), not internal implementation detail.
 - Record significant design decisions in `docs/design/` rather than letting
   them live only in code or commit messages.
+- **Git workflow: rebase feature branches ONTO main; never merge main INTO a
+  feature branch.** Feature-branch history is yours — rewrite, reorder, and
+  force-push it freely to keep it clean. Main is shared: reorganizing it can
+  destroy or disrupt others' work, so it must stay coherent, and merge
+  commits from main must never appear in a feature branch's history.
+- **Always sign commits** (`commit.gpgsign` is on; the key lives in
+  Secretive and needs on-device approval). Never bypass with
+  `--no-gpg-sign` — if signing fails or hangs, stop and ask rather than
+  committing unsigned.
