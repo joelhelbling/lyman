@@ -110,6 +110,27 @@ pipeline. Point it elsewhere with `LYMAN_BASE_URL` and `LYMAN_MODEL`.
 The longer story — mission, principles, architecture decisions, open
 questions — is in [docs/vision.md](docs/vision.md).
 
+## Documentation
+
+The **[wiki](https://github.com/joelhelbling/lyman/wiki)** is the guided
+tour:
+
+- [Getting Started](https://github.com/joelhelbling/lyman/wiki/Getting-Started) —
+  scaffold a project and talk to a local model in five minutes
+- [Core Concepts](https://github.com/joelhelbling/lyman/wiki/Core-Concepts) —
+  workers, the item, the shell, the circuit, and the sharp edges
+- [Harness Archetypes](https://github.com/joelhelbling/lyman/wiki/Harness-Archetypes) —
+  choosing between the [REPL](https://github.com/joelhelbling/lyman/wiki/The-REPL-Archetype),
+  [Daemon](https://github.com/joelhelbling/lyman/wiki/The-Daemon-Archetype), and
+  [Script](https://github.com/joelhelbling/lyman/wiki/The-Script-Archetype) shapes
+- [The Generator CLI](https://github.com/joelhelbling/lyman/wiki/The-Generator-CLI) —
+  `new`, `add`, `update`, `eject`, `diff`, `doctor`, and the manifest
+
+The wiki's source of truth is the [`wiki/`](wiki/) directory in this repo —
+documentation changes ride through pull requests, then publish with
+[`wiki/publish.sh`](wiki/publish.sh). For design *intent*, the
+[docs/](docs/) design notes remain authoritative.
+
 ## Is lyman a good fit for you?
 
 **Probably yes, if:**
