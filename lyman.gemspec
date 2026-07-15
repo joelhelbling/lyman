@@ -13,6 +13,7 @@ Gem::Specification.new do |spec|
   spec.required_ruby_version = ">= 3.2"
 
   spec.metadata["homepage_uri"] = spec.homepage
+  spec.metadata["changelog_uri"] = "#{spec.homepage}/blob/main/CHANGELOG.md"
 
   # lyman is a pure generator (see docs/design/deployment.md): the gem plants
   # legible source into client projects rather than being required by them
@@ -20,7 +21,7 @@ Gem::Specification.new do |spec|
   # inventory — the registry (lib/lyman/cli/registry.rb) says which is which.
   spec.files = Dir[
     "lib/**/*", "harness/**/*", "templates/**/*", "exe/*",
-    "LICENSE", "README.md", "docs/**/*"
+    "LICENSE", "README.md", "CHANGELOG.md", "docs/**/*"
   ].select { |f| File.file?(f) }
 
   spec.bindir = "exe"
