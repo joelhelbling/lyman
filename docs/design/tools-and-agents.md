@@ -79,6 +79,35 @@ finishes, so the agent cannot react to their outcome.
 Results are structured — per-patch status and check output — and follow
 "no news is good news": test output is included only when tests failed.
 
+## Developer experience: what changes, and what it costs
+
+These notes should drive the README and wiki updates that accompany each
+issue as it lands — the documentation change is part of the change.
+
+What gets better:
+
+- **Tools become plantable.** `lyman add` grows from harnesses to an
+  arsenal. A new project can start with file search, file reading, and
+  patching rather than a clock demo.
+- **Sub-agents get a named, boring shape.** Once agent-as-tool is a
+  documented pattern, "write a sub-agent" means writing a script-shaped
+  wiring inside a handler. There is no second framework to learn, and the
+  same runaway guard protects it.
+- **Structural guarantees replace prompt discipline.** The patch agent
+  cannot fix failing tests because it has no tool that sees them.
+  Developers can trust a property of the wiring instead of hoping the
+  model obeys an instruction.
+
+What it costs, stated plainly:
+
+- **Latency from delegation.** Every reader-agent call is an extra model
+  round trip. The query-decides routing rule limits it, but developers
+  will feel it on slow local models.
+- **More surface to configure.** Patch format, check command, test
+  command, and result shape are all knobs; each should have a default that
+  works for a Ruby project out of the box, and be documented where the
+  tool is planted.
+
 ## Order of work
 
 1. Plantable tools convention.

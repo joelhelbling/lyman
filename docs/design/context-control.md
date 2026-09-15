@@ -108,6 +108,47 @@ chain. Over-compaction is thereby redressable rather than fatal. This tool
 is the bridge to the tools direction described in
 [tools-and-agents.md](tools-and-agents.md).
 
+## Developer experience: what changes, and what it costs
+
+These notes should drive the README and wiki updates that accompany each
+issue as it lands — the documentation change is part of the change.
+
+What gets better:
+
+- **Conversations become something you can point at.** Today a conversation
+  is a list of hashes inspectable only by index. With elements and
+  addresses, a developer can name a reasoning block or a single tool
+  result, log it, query it, or hand it to a tool. Debugging changes most:
+  "what did the model see on round three" becomes a query against the
+  store instead of a print statement placed in advance.
+- **Context management is a wiring choice, not a mode.** An abridgement
+  policy is an object picked when wiring the chat completion worker;
+  compaction is a sidecar shell spliced in with one side worker. A
+  developer who wants no context management still gets today's plain
+  circuit. This is "guts on the outside" extended to the part of agent
+  frameworks that is usually most hidden.
+- **Compaction stops being a stall.** Because the ledger is kept
+  continuously, a compaction request is a drain and a handoff, not a full
+  summarization pass — removing the worst pause in a long local-model
+  session.
+- **Losing context stops being permanent.** The recall tool and the
+  ancestor chain make an over-aggressive compaction a recoverable mistake,
+  which lowers the stakes of experimenting with compaction strategies —
+  exactly the experimentation lyman wants to invite.
+
+What it costs, stated plainly:
+
+- **A breaking change to the conversation shape.** Anything reading
+  messages directly — the repl's printers included — must move to elements
+  or the wire projection. The elements issue is small in concept but
+  touches everything.
+- **A second model and a thread.** The compactor needs a fast model running
+  alongside the main one, and a thread with a request-and-handoff
+  protocol. Both are new kinds of thing in a codebase that has so far been
+  single-threaded and single-model.
+- **A SQLite dependency.** Confined to one worker, but the first
+  native-extension gem in the plantable set.
+
 ## Order of work
 
 1. Conversation as a series of identifiable elements, with the wire
