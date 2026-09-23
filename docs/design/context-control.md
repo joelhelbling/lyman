@@ -1,6 +1,7 @@
 # Design note: fine-grained control of context
 
-**Status:** accepted direction; part 1 (elements, issue #8) is implemented
+**Status:** accepted direction; part 1 (elements, issue #8) and part 2
+(store, issue #9) are implemented
 **Tracked by:** the "context control" GitHub issues (elements, store,
 abridgement, compaction sidecar, recall tool)
 
@@ -110,15 +111,79 @@ transport's `usage` report is the natural input for that decision, and
 
 ## Store and recall
 
-SQLite, confined to one store worker (dependency isolation). Two tables —
-`conversations` (id, parent id) and `elements` (conversation id, sequence,
-type, JSON content) — plus a full-text index on content. A side worker
-appends elements as they flow through the circuit.
+`Lyman::Store` (`lib/lyman/store.rb`) is the persistent side of the
+element series, and the only file in the plantable library that requires
+the `sqlite3` gem — dependency isolation applied to a native-extension
+dependency for the first time in the plantable set. `Store.new(path)`
+opens (and creates, if needed) a SQLite database at a file path or
+`:memory:`.
 
-A **recall tool** lets the model re-expand what a ledger entry points at:
-query by conversation id, element range, or text, walking the ancestor
-chain. Over-compaction is thereby redressable rather than fatal. This tool
-is the bridge to the tools direction described in
+Two tables carry the schema described above almost verbatim: `conversations`
+(`id`, `parent_id`, `created_at`) and `elements` (`conversation_id`, `seq`,
+`type`, `content` as JSON), keyed on `(conversation_id, seq)`. An FTS5
+table, `element_text`, indexes each element's searchable text — the text
+itself for `system`/`user`/`reasoning`/`assistant`/`tool_result`, and the
+function name plus arguments for `tool_call` — so `search` works without
+the caller thinking about how a tool call differs from a message.
+
+`append(conversation)` is **idempotent**: it records the conversation row
+once, then inserts only the elements whose `seq` is beyond what's already
+stored. Because elements are immutable and append-only, "beyond the
+highest stored seq" is an exact test, not a heuristic — calling `append`
+repeatedly on a growing conversation, or replaying the same round, never
+duplicates a row. That's what makes the store safe to splice into the
+circuit as a plain side worker rather than something with its own
+buffering or dedup logic.
+
+The read side mirrors element addressing: `conversation(id)`,
+`elements(id, range = nil)`, `element(id, seq)`, and `fetch(address)` —
+where `address` is what `Element#address` produces (`"conv:abc#17"`),
+widened to a whole conversation (`"conv:abc"`) or a run
+(`"conv:abc#17-23"`), so a value read out
+of a ledger entry round-trips straight back into a store lookup with no
+translation layer. `search(query, conversation_id: nil, limit: 20)` takes
+plain words rather than FTS syntax, ranked by SQLite's `bm25`; given a
+`conversation_id` it searches that conversation *and its ancestors*, so a
+search from inside a compacted conversation still finds material that was
+compacted away. `lineage(id)` returns the ancestor chain
+(`[id, parent, grandparent, …]`) that both `search` and, later, the
+recall tool walk. `load(id)` rebuilds a full `Lyman::Conversation` from
+its stored elements.
+
+`parent_id` therefore lives on `Conversation` itself (default `nil`), not
+bolted onto the store schema alone — it's the compaction lineage pointer
+a compacted conversation uses to name the one it compacted, and the store
+just persists it. Identity and lineage are conversation-level concepts;
+the store is one place (of potentially several) that can persist them.
+
+Wiring the store in is a `side_worker`, `Lyman::Workers.store_append`,
+spliced after `tool_execution` and before the finished filter so it sees
+every round, including the one that finishes the turn:
+
+```ruby
+store = Lyman::Store.new("conversations.db")
+pipeline =
+  source_worker { rounds.shift } |
+  Lyman::Workers.chat_completion(base_url: BASE_URL, model: MODEL, tools: schemas) |
+  relay_worker { |c| (c.pending_tool_calls.empty? || c.runaway?) ? c.finish : c } |
+  Lyman::Workers.tool_execution(handlers) |
+  Lyman::Workers.store_append(store) |
+  side_worker { |c| rounds << c unless c.finished? } |
+  filter_worker { |c| c.finished? }
+```
+
+`store_append` never mentions sqlite — it calls `store.append(conversation)`
+against whatever object it's given, so a fake or an alternate store
+implementation stands in without the worker changing. Durability is
+therefore an opt-in splice, not a built-in assumption: the shipped
+harnesses stay stdlib-only, and a developer who wants a store adds it to
+their own wiring script with `lyman add store` / `lyman add store_append`.
+
+A **recall tool** (issue #12) lets the model re-expand what a ledger
+entry points at: query by conversation id, element range, or text,
+walking the ancestor chain the store already exposes via `lineage`.
+Over-compaction is thereby redressable rather than fatal. This tool is
+the bridge to the tools direction described in
 [tools-and-agents.md](tools-and-agents.md).
 
 ## Developer experience: what changes, and what it costs

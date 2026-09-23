@@ -107,6 +107,12 @@ pipeline. Point it elsewhere with `LYMAN_BASE_URL` and `LYMAN_MODEL`.
 - **Dependencies stay inside the workers that need them.** The HTTP client
   lives in exactly one file. Use your favorite gems — in such a way that only
   the worker requiring one knows it exists.
+- **Persistence is an opt-in splice, not a built-in.** `Lyman::Store` (SQLite,
+  confined to its own file) gives a conversation a durable, addressable,
+  full-text-searchable home; `Lyman::Workers.store_append` is the one
+  `side_worker` that wires it into a circuit. Neither is planted by
+  `lyman new` — add them with `lyman add store` when a harness needs to
+  survive a restart or be queried.
 
 The longer story — mission, principles, architecture decisions, open
 questions — is in [docs/vision.md](docs/vision.md).
@@ -183,11 +189,12 @@ touched at all: it's yours from day one.
 ## Status
 
 Early and moving. What exists today: the vision, circuit-pattern,
-harness-archetypes, and deployment design docs, the core `Conversation` item,
-chat-completion and tool-execution workers, the three archetype harnesses
-(repl, daemon, script) working against live local models, and the generator
-CLI (`new` / `add` / `update` / `eject` / `diff` / `doctor` / `list`) with a
-Minitest suite behind it. Published to
+harness-archetypes, and deployment design docs, the core `Conversation` item
+(an append-only element series), chat-completion and tool-execution workers,
+an optional SQLite `Store` with lineage and full-text search, the three
+archetype harnesses (repl, daemon, script) working against live local
+models, and the generator CLI (`new` / `add` / `update` / `eject` / `diff` /
+`doctor` / `list`) with a Minitest suite behind it. Published to
 [rubygems.org](https://rubygems.org/gems/lyman) — install it with:
 
 ```sh

@@ -80,8 +80,14 @@ module the harness merely wires together.
 | `conversation` | the item that flows through pipelines — managed |
 | `chat_completion` | the model transport; the only file that knows HTTP exists — managed |
 | `tool_execution` | executes pending tool calls — managed |
+| `store` | `Lyman::Store` — SQLite conversation persistence with lineage and full-text search; the only file that knows `sqlite3` exists — managed, opt-in: `lyman add store` |
+| `store_append` | the `side_worker` that splices a `store` into a circuit — managed, opt-in: `lyman add store_append` |
 | `claude_md` | guidance for coding agents working in your project — owned |
 | `claude_skill` | the same guidance as a Claude Code skill, for projects that already have a `CLAUDE.md` lyman shouldn't clobber — opt-in |
+
+`lyman add store` plants `Lyman::Store` and prints a reminder to add
+`gem "sqlite3"` to your `Gemfile` if it isn't already there — the
+`Gemfile` is owned by you, so lyman advises rather than edits it.
 
 ## `lyman doctor`
 
