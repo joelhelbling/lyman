@@ -60,7 +60,8 @@ all visible top to bottom with nothing else happening.
 - **Everything between stays on the conversation.** Tool calls,
   intermediate rounds, reasoning — all on the `Conversation` item. Want to
   see them? Splice a logging `side_worker` into the circuit, or dump
-  `result.messages` to a file before exiting.
+  `result.elements` (the full-fidelity series) or `result.messages`
+  (the OpenAI-style projection) to a file before exiting.
 - **Exit codes are yours to design.** `abort` already covers the no-task
   case; a natural extension is exiting nonzero when
   `result.runaway?` — the turn hit `max_rounds` instead of finishing

@@ -1,6 +1,6 @@
 # Design note: fine-grained control of context
 
-**Status:** accepted direction (pre-implementation)
+**Status:** accepted direction; part 1 (elements, issue #8) is implemented
 **Tracked by:** the "context control" GitHub issues (elements, store,
 abridgement, compaction sidecar, recall tool)
 
@@ -42,6 +42,19 @@ A conversation lies where it falls: elements are never revised or
 rearranged. Immutability was already the rule (see
 [immutable-conversation.md](immutable-conversation.md)); identity makes it
 addressable.
+
+### Shapes
+
+Each element's `content` is a string-keyed hash — `{"text"=>...}` for
+system, user, reasoning, and assistant; the raw tool call hash for
+tool_call; `{"tool_call_id"=>..., "text"=>...}` for tool_result. Sequence
+numbers are 1-based.
+
+Every model reply decomposes to an optional reasoning element, exactly one
+assistant element, then one tool_call element for each tool call — in order
+received. This structure makes the regrouping back onto OpenAI-style
+messages unambiguous: a single assistant message carries its tool calls
+back in their original order.
 
 The OpenAI-compatible message list becomes a **projection**: elements are
 regrouped into wire messages (reasoning stripped, a reply's tool calls
