@@ -73,10 +73,10 @@ workers in your own namespace or directory, not inside `lib/lyman/`.
    between jobs based on item state is the anti-pattern to avoid
    (multi-way dispatch) — split it into stages, or use a splitter, instead.
 
-5. **Wire vs. conversation.** Reasoning/thinking content stays on messages in
-   the `Conversation` for observability, but `Workers.wire_messages` strips
-   it before anything goes out over the wire. Preserve that separation if
-   you touch message handling.
+5. **Wire vs. conversation.** Reasoning elements stay on the `Conversation`
+   for observability, but `Conversation#wire_messages` strips them before
+   anything goes out over the wire. Preserve that separation if you touch
+   message handling.
 
 ## Other conventions
 

@@ -84,9 +84,10 @@ pipeline. Point it elsewhere with `LYMAN_BASE_URL` and `LYMAN_MODEL`.
 ## How it works, briefly
 
 - **The item is the conversation.** What flows through the pipeline is a
-  `Conversation` — the full message history plus the control data workers
-  consult (`finished?`, `pending_tool_calls`). A turn carries its whole
-  conversation with it; that's what makes it a conversation.
+  `Conversation` — an append-only series of elements (system, user, reasoning,
+  assistant, tool_call, tool_result) plus the control data workers consult
+  (`finished?`, `pending_tool_calls`). A turn carries its whole conversation
+  with it; that's what makes it a conversation.
 - **State lives in the shell.** The enclosing scope — the *shell* — is just
   state plus a process: the conversation, a queue, and a deliberately boring
   loop. A human REPL is one shell; an autonomous email-triager is another.

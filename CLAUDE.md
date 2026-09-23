@@ -37,7 +37,8 @@ source of truth for intent; this file is a summary plus working conventions.
 ## Layout
 
 - `lib/lyman/` — the plantable library: `Conversation` (the item that flows
-  through pipelines) and `Workers` (factories like `chat_completion`,
+  through pipelines), `Element` (the typed, addressable units stored in a
+  conversation), and `Workers` (factories like `chat_completion`,
   `tool_execution`). These files are both what this repo runs and what the
   generator plants into client projects — one copy, kept alive by use.
 - `lib/lyman/cli/` — generator machinery (Thor CLI, registry, manifest,
@@ -104,14 +105,14 @@ Concrete consequences:
 - **Runaway turns:** the model⇄tool circuit is bounded by the round counter on
   `Conversation` (`runaway?` / `max_rounds`). Keep that guard intact when
   rewiring.
-- **Wire vs. conversation:** reasoning/thinking content is kept on messages in
-  the `Conversation` for observability but stripped from API payloads
-  (`wire_messages`). Preserve that separation.
+- **Wire vs. conversation:** reasoning elements are kept on the `Conversation`
+  for observability but stripped by `Conversation#wire_messages` before
+  anything goes out over the wire. Preserve that separation.
 
 ## Working conventions
 
-- Messages use string keys throughout, matching the OpenAI-compatible wire
-  format — no symbol-key message hashes.
+- Elements and messages use string keys throughout, matching the
+  OpenAI-compatible wire format — no symbol-key hashes.
 - Match the existing comment style: comments explain *why* and record design
   intent, not what the next line does.
 - Verify pipeline changes against a live local model when possible; the harness

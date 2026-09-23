@@ -29,13 +29,20 @@ anything new.
 ## The item: a `Conversation`
 
 What flows through the pipeline is a `Lyman::Conversation` — the **whole
-message history so far** (a turn that didn't carry its history wouldn't be a
-conversation), plus the control data workers consult:
+conversation history so far** (a turn that didn't carry its history wouldn't
+be a conversation), plus the control data workers consult:
 
 - `finished?` — has this turn produced its final answer?
 - `pending_tool_calls` — did the model just ask for tools?
 - `runaway?` / `max_rounds` — the guard against a model that never stops
   calling tools.
+
+A conversation is an append-only series of typed **elements**: system prompts,
+user messages, reasoning blocks, assistant messages, tool calls, and tool
+results. Each element carries the conversation's `id` (a UUID) and its `seq`
+(sequence position, 1-based), so `conv:abc#17` names one element and
+`conv:abc#17-23` names a range. Each element is itself an immutable value;
+its `content` is a plain hash with **string keys**.
 
 `Conversation` is an **immutable value** (a `Data` subclass): shifty 0.6
 deep-freezes every value it hands across a worker boundary, so change is
@@ -47,11 +54,12 @@ inside a worker stays freely mutable — only handed-off values freeze:
 "mutable within, immutable between." See
 [docs/design/immutable-conversation.md](https://github.com/joelhelbling/lyman/blob/main/docs/design/immutable-conversation.md).)
 
-Messages are plain hashes with **string keys**, matching the
-OpenAI-compatible wire format — what you see on the item is what goes over
-the wire. (One deliberate exception: each message's `reasoning` stays on the
-`Conversation` for observability but is stripped from API payloads by
-`Workers.wire_messages` — providers reject or waste context on it.)
+The conversation also exposes a **projection back to OpenAI-style messages**:
+`Conversation#messages` regroups elements into wire messages and keeps
+reasoning elements for observability; `Conversation#wire_messages` does the
+same but strips reasoning before anything goes out over the wire. This lets
+code see and work with the full history (elements) or a specific view of it
+(messages or wire messages) as the situation demands.
 
 ### Item-as-control, and its discipline
 
@@ -139,9 +147,11 @@ Five facts that are load-bearing in every harness. They're also in the
    cycle forever inside one `shift`. The round counter on `Conversation`
    (`runaway?` / `max_rounds`) is that guard — it matters most in the
    harnesses where no human is watching.
-4. **Wire vs. conversation.** Reasoning content stays on the item for
-   observability, but never rides back to the model. Preserve the
-   separation if you touch message handling.
+4. **Wire vs. conversation.** Reasoning elements stay on the conversation
+   for observability but are stripped by `wire_messages` before any call to
+   the model. A side effect — `messages` includes reasoning for debugging,
+   while `wire_messages` never does. Preserve the separation if you touch
+   message handling.
 5. **Dependency isolation.** Each gem is confined to the single worker (or
    display widget) that needs it. The HTTP client lives in exactly one
    file; cli-ui lives only in the repl's display layer. Use your favorite

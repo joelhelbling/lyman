@@ -69,3 +69,12 @@ Consequences, visible in the code:
 - `Shifty::Testing.mutates_input?(worker, input)` (opt-in
   `require "shifty/testing"`) is the mutation detector — use it when
   vetting a worker whose task you don't fully control.
+
+## Follow-up: elements (2026-09-23)
+
+In [issue #8](https://github.com/joelhelbling/lyman/issues/8),
+the conversation's inner shape changed from a list of messages to an
+append-only series of typed `Element` values, addressable by sequence
+number. Immutability now carries *stronger* meaning: not just "don't mutate
+what's passed between workers," but "elements are never revised or
+rearranged." See [context-control.md](context-control.md) for the design.
