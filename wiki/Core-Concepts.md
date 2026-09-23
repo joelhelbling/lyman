@@ -61,6 +61,41 @@ same but strips reasoning before anything goes out over the wire. This lets
 code see and work with the full history (elements) or a specific view of it
 (messages or wire messages) as the situation demands.
 
+### The store: persistence as a splice, not a mode
+
+`Lyman::Store` gives the element series a durable, queryable home — an
+optional, opt-in artifact (`lyman add store`), not something `lyman new`
+plants for you. It's a SQLite database (the only file in the plantable
+library that requires the `sqlite3` gem — dependency isolation holds even
+for a native-extension dependency) with two tables — `conversations`
+(id, parent id, created at) and `elements` (conversation id, seq, type,
+content) — plus a full-text index over each element's searchable text, so
+a tool call is findable by its function name and arguments the same way a
+message is findable by its words.
+
+Wiring it in is one `side_worker`:
+
+```ruby
+store = Lyman::Store.new("conversations.db")
+pipeline =
+  source_worker { rounds.shift } |
+  Lyman::Workers.chat_completion(base_url:, model:, tools:) |
+  relay_worker { |c| (c.pending_tool_calls.empty? || c.runaway?) ? c.finish : c } |
+  Lyman::Workers.tool_execution(handlers) |
+  Lyman::Workers.store_append(store) |            # persists every round, finished or not
+  side_worker { |c| rounds << c unless c.finished? } |
+  filter_worker { |c| c.finished? }
+```
+
+`append` is idempotent — because elements are immutable and append-only,
+it only ever inserts the elements beyond the highest `seq` already stored,
+so re-appending a growing conversation never duplicates rows. Reading
+back mirrors element addressing: `store.fetch("conv:abc#17-23")` and
+`store.search("timezone bug")` both return `Element`s, and `search`
+given a `conversation_id` follows `lineage` up through ancestor
+conversations too — the same chain a future compaction step will use to
+recover what a ledger entry summarized.
+
 ### Item-as-control, and its discipline
 
 The item both *is transformed by* workers and *directs their behavior* —

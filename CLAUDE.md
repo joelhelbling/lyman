@@ -33,14 +33,23 @@ source of truth for intent; this file is a summary plus working conventions.
 - `bundle exec exe/lyman` — the generator CLI (`new` / `add` / `update` /
   `eject` / `diff` / `doctor` / `list`). `LYMAN_SOURCE_ROOT` points it at an
   alternate artifact-source tree — how tests simulate a newer lyman release.
+  `lyman add store` plants `Lyman::Store` and advises adding `gem "sqlite3"`
+  to the client Gemfile if it isn't already there — the Gemfile is owned by
+  the user, so lyman advises rather than edits it. The `sqlite3` gem is
+  already in this repo's own `Gemfile`, for the store's tests and harness use.
 
 ## Layout
 
 - `lib/lyman/` — the plantable library: `Conversation` (the item that flows
   through pipelines), `Element` (the typed, addressable units stored in a
-  conversation), and `Workers` (factories like `chat_completion`,
-  `tool_execution`). These files are both what this repo runs and what the
-  generator plants into client projects — one copy, kept alive by use.
+  conversation), `Store` (`store.rb` — the only file that requires the
+  `sqlite3` gem; persists conversations with lineage and a full-text
+  index), and `Workers` (factories like `chat_completion`,
+  `tool_execution`, and `store_append`, the `side_worker` that splices a
+  `Store` into a circuit). These files are both what this repo runs and
+  what the generator plants into client projects — one copy, kept alive by
+  use. `Store` and `store_append` are managed but optional: `lyman new`
+  doesn't plant them, `lyman add store` / `lyman add store_append` do.
 - `lib/lyman/cli/` — generator machinery (Thor CLI, registry, manifest,
   planter). Never planted into client projects. The boundary between what
   lyman *does* (this directory) and what it *installs* is the registry,
