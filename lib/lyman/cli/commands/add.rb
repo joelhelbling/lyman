@@ -44,9 +44,26 @@ module Lyman
           plant(manifest, name, spec, project_root)
           manifest.save
           @thor.say "Planted #{name} (#{spec[:role]}) at #{spec[:dest]}."
+          advise_on_gems(name, spec, project_root)
         end
 
         private
+
+        # The client Gemfile is owned, so lyman advises rather than edits it —
+        # planting a file that `require`s a gem the project never declared
+        # would fail confusingly at runtime instead of here, up front.
+        def advise_on_gems(name, spec, project_root)
+          (spec[:gems] || []).each do |gem_name|
+            next if gemfile_mentions?(project_root, gem_name)
+            @thor.say "#{name} needs the #{gem_name} gem: add gem \"#{gem_name}\" to your Gemfile and run bundle install."
+          end
+        end
+
+        def gemfile_mentions?(project_root, gem_name)
+          gemfile = File.join(project_root, "Gemfile")
+          return false unless File.exist?(gemfile)
+          /gem\s+["']#{Regexp.escape(gem_name)}["']/.match?(File.read(gemfile)) || false
+        end
 
         def plant(manifest, name, spec, project_root)
           bytes = Planter.plant(name, spec, project_root: project_root, source_root: @source_root)

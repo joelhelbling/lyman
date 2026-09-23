@@ -58,7 +58,7 @@ class NewTest < Minitest::Test
       project = scaffold_project
       manifest = Lyman::CLI::Manifest.load(project)
 
-      Lyman::CLI::Registry.managed.each do |name, spec|
+      Lyman::CLI::Registry.default.select { |_, spec| spec[:role] == :managed }.each do |name, spec|
         bytes = File.read(File.join(project, spec[:dest]))
         assert_equal Lyman::CLI::Planter.hash(bytes), manifest.artifact(name)["hash"]
       end
@@ -69,7 +69,7 @@ class NewTest < Minitest::Test
     in_tmpdir do
       project = scaffold_project
 
-      Lyman::CLI::Registry.managed.each_value do |spec|
+      Lyman::CLI::Registry.default.select { |_, spec| spec[:role] == :managed }.each_value do |spec|
         content = File.read(File.join(project, spec[:dest]))
         assert_includes content, "Managed by lyman", "expected banner in #{spec[:dest]}"
       end

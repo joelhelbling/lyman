@@ -60,11 +60,16 @@ module Lyman
   #
   # Messages and element content use string keys throughout, for clean
   # round-tripping with OpenAI-compatible wire formats.
-  class Conversation < Data.define(:id, :elements, :rounds, :max_rounds, :finished)
-    def initialize(system_prompt: nil, id: nil, elements: nil, rounds: 0, max_rounds: 10, finished: false)
+  class Conversation < Data.define(:id, :parent_id, :elements, :rounds, :max_rounds, :finished)
+    # parent_id is the compaction lineage pointer: a compacted conversation
+    # names the conversation it compacted, so a store can walk the ancestor
+    # chain to recall what an over-aggressive compaction dropped. nil for an
+    # ordinary conversation with no ancestor. See docs/design/context-control.md
+    # ("Two kinds of reduction, kept apart").
+    def initialize(system_prompt: nil, id: nil, parent_id: nil, elements: nil, rounds: 0, max_rounds: 10, finished: false)
       id ||= SecureRandom.uuid
       elements ||= system_prompt ? [Element.new(conversation_id: id, seq: 1, type: "system", content: {"text" => system_prompt})] : []
-      super(id: id, elements: elements, rounds: rounds, max_rounds: max_rounds, finished: finished)
+      super(id: id, parent_id: parent_id, elements: elements, rounds: rounds, max_rounds: max_rounds, finished: finished)
     end
 
     def with_user_message(text)

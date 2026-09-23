@@ -32,6 +32,26 @@ module Lyman
           role: :managed,
           description: "Relay worker: executes pending tool calls"
         },
+        # `optional:` keeps `new` from planting these — a SQLite
+        # native-extension dependency shouldn't be presumed on a fresh
+        # scaffold; reach it with `lyman add store`. `gems:` names gem
+        # dependencies the client Gemfile (an owned file) needs but that
+        # planting doesn't add for them; `add` advises rather than edits it.
+        "store" => {
+          source: "lib/lyman/store.rb",
+          dest: "lib/lyman/store.rb",
+          role: :managed,
+          optional: true,
+          gems: ["sqlite3"],
+          description: "SQLite conversation store: lineage and full-text recall (docs/design/context-control.md)"
+        },
+        "store_append" => {
+          source: "lib/lyman/workers/store_append.rb",
+          dest: "lib/lyman/workers/store_append.rb",
+          role: :managed,
+          optional: true,
+          description: "Side worker: persists conversations to any duck-typed store as they flow through the circuit"
+        },
         # The three harness archetypes (docs/design/harness-archetypes.md):
         # same circuit, different shells. `new` plants the repl — the
         # archetype you can talk to on day one; the other two are opt-in
