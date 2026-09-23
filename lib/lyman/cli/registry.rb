@@ -18,7 +18,7 @@ module Lyman
           source: "lib/lyman/conversation.rb",
           dest: "lib/lyman/conversation.rb",
           role: :managed,
-          description: "The item that flows through pipelines"
+          description: "The item that flows through pipelines: an append-only series of elements"
         },
         "chat_completion" => {
           source: "lib/lyman/workers/chat_completion.rb",

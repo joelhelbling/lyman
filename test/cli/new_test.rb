@@ -11,6 +11,20 @@ class NewTest < Minitest::Test
     end
   end
 
+  # Element and Conversation upgrade together, so they ship as one planted
+  # file: a project that updates conversation.rb must never be left
+  # requiring a sibling its manifest doesn't know about.
+  def test_planted_conversation_is_self_contained
+    in_tmpdir do
+      project = scaffold_project
+      script = 'require "./lib/lyman/conversation"; ' \
+        'c = Lyman::Conversation.new(system_prompt: "hi"); print c.elements.first.class'
+      out = IO.popen([RbConfig.ruby, "-e", script], chdir: project, &:read)
+
+      assert_equal "Lyman::Element", out
+    end
+  end
+
   def test_skips_optional_artifacts
     in_tmpdir do
       project = scaffold_project

@@ -16,7 +16,10 @@ module Lyman
       relay_worker do |conversation|
         # Fold results onto the accumulator while iterating the *original*
         # conversation's pending calls: each with_tool_result appends a
-        # tool message, which empties pending_tool_calls on the new value.
+        # tool_result element, which empties pending_tool_calls on the new
+        # value (pending_tool_calls looks for tool_call elements after the
+        # last assistant element, and a tool_result becomes the new last
+        # element).
         conversation.pending_tool_calls.reduce(conversation) do |convo, tool_call|
           break convo if convo.finished?
 
