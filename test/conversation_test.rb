@@ -13,6 +13,18 @@ class ConversationTest < Minitest::Test
     refute_equal a.id, b.id
   end
 
+  def test_parent_id_defaults_to_nil
+    assert_nil Lyman::Conversation.new.parent_id
+  end
+
+  def test_parent_id_is_settable_and_survives_with_calls
+    convo = Lyman::Conversation.new(parent_id: "parent-1")
+    updated = convo.with_user_message("hello")
+
+    assert_equal "parent-1", convo.parent_id
+    assert_equal "parent-1", updated.parent_id
+  end
+
   def test_id_is_preserved_across_with_calls
     convo = Lyman::Conversation.new(system_prompt: "hi")
     updated = convo.with_user_message("hello")

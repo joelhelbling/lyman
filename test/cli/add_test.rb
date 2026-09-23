@@ -124,6 +124,52 @@ class AddTest < Minitest::Test
     end
   end
 
+  def test_add_store_plants_it_and_advises_the_missing_gem
+    in_tmpdir do
+      scaffold_project("demo")
+      Dir.chdir("demo") do
+        refute_includes File.read("Gemfile"), "sqlite3"
+
+        result = run_cli("add", "store")
+
+        assert_equal 0, result.status
+        assert File.exist?("lib/lyman/store.rb")
+        manifest = Lyman::CLI::Manifest.load(Dir.pwd)
+        assert_equal "managed", manifest.artifact("store")["status"]
+        assert_includes result.out, "store needs the sqlite3 gem"
+        assert_includes result.out, "gem \"sqlite3\""
+      end
+    end
+  end
+
+  def test_add_store_gives_no_advice_when_gemfile_already_has_the_gem
+    in_tmpdir do
+      scaffold_project("demo")
+      Dir.chdir("demo") do
+        File.open("Gemfile", "a") { |f| f.puts 'gem "sqlite3"' }
+
+        result = run_cli("add", "store")
+
+        assert_equal 0, result.status
+        refute_includes result.out, "needs the sqlite3 gem"
+      end
+    end
+  end
+
+  def test_add_store_append_plants_the_worker
+    in_tmpdir do
+      scaffold_project("demo")
+      Dir.chdir("demo") do
+        result = run_cli("add", "store_append")
+
+        assert_equal 0, result.status
+        assert File.exist?("lib/lyman/workers/store_append.rb")
+        manifest = Lyman::CLI::Manifest.load(Dir.pwd)
+        assert_equal "managed", manifest.artifact("store_append")["status"]
+      end
+    end
+  end
+
   def test_readd_over_tombstone_prompts_and_force_restores_managed_status
     in_tmpdir do
       scaffold_project("demo")

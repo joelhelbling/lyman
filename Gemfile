@@ -12,3 +12,8 @@ group :development, :test do
   gem "rake"
   gem "minitest"
 end
+
+# Not a gemspec dependency either — the store is optional plantable
+# inventory (lib/lyman/store.rb), but this repo needs it to run and test
+# that artifact against real SQLite.
+gem "sqlite3"
