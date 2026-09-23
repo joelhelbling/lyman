@@ -15,14 +15,17 @@ class ToolPrinter
   end
 
   def results(conversation)
-    messages = conversation.messages
-    request = messages.rindex { |m| m["role"] == "assistant" }
-    return unless request
-    names = (messages[request]["tool_calls"] || [])
-      .to_h { |tc| [tc["id"], tc.dig("function", "name")] }
-    messages[(request + 1)..].each do |message|
-      next unless message["role"] == "tool"
-      summary = gray("#{names[message["tool_call_id"]]} → #{summarize(message["content"])}")
+    elements = conversation.elements
+    reply_start = elements.rindex { |e| e.type == "assistant" }
+    return unless reply_start
+
+    reply = elements[(reply_start + 1)..]
+    names = reply.select { |e| e.type == "tool_call" }
+      .to_h { |e| [e.content["id"], e.content.dig("function", "name")] }
+
+    reply.each do |element|
+      next unless element.type == "tool_result"
+      summary = gray("#{names[element.content["tool_call_id"]]} → #{summarize(element.content["text"])}")
       puts "  #{CLI::UI.fmt("{{v}}")} #{summary}"
     end
   end

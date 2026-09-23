@@ -27,7 +27,7 @@ module Lyman
       uri = URI("#{base_url.chomp("/")}/chat/completions")
 
       relay_worker do |conversation|
-        payload = {"model" => model, "messages" => wire_messages(conversation.messages)}
+        payload = {"model" => model, "messages" => conversation.wire_messages}
         payload["tools"] = tools if tools && !tools.empty?
         payload["stream"] = true if on_delta
 
@@ -43,16 +43,6 @@ module Lyman
           end
 
         conversation.with_assistant_message(message)
-      end
-    end
-
-    # The conversation keeps each message's reasoning (it's useful to
-    # observability), but it never rides back to the model: providers
-    # either ignore it, reject it outright (DeepSeek), or would burn
-    # context re-reading thoughts the model already finished thinking.
-    def self.wire_messages(messages)
-      messages.map do |message|
-        message.reject { |key, _| key == "reasoning" || key == "reasoning_content" }
       end
     end
 
