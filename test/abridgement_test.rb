@@ -80,6 +80,35 @@ class AbridgementTest < Minitest::Test
     assert_equal original.content["text"], view.element(3).content["text"]
   end
 
+  # The knob's boundary: a result with exactly keep_rounds replies after
+  # it is stubbed; one reply fewer and it's still sent whole.
+  def test_stub_tool_results_age_boundary
+    convo = long_tool_result_conversation # tool_result age is 3
+
+    assert_match(/\A\[abridged: /, Lyman::Abridgement::StubToolResults.new(keep_rounds: 3).call(convo).element(3).content["text"])
+    assert_equal convo.element(3).content["text"],
+      Lyman::Abridgement::StubToolResults.new(keep_rounds: 4).call(convo).element(3).content["text"]
+  end
+
+  # A result the model hasn't replied to yet (age 0) is always sent whole;
+  # a keep_rounds that would stub it is refused rather than honored.
+  def test_stub_tool_results_never_stubs_an_unseen_result
+    convo = Lyman::Conversation.new
+      .with_assistant_message({
+        "role" => "assistant",
+        "content" => nil,
+        "tool_calls" => [{"id" => "call_1", "type" => "function", "function" => {"name" => "current_time", "arguments" => "{}"}}]
+      })
+      .with_tool_result("call_1", "x" * 500)
+
+    view = Lyman::Abridgement::StubToolResults.new(keep_rounds: 1).call(convo)
+    assert_equal "x" * 500, view.element(3).content["text"]
+
+    [0, -1, nil, 1.5].each do |bad|
+      assert_raises(ArgumentError) { Lyman::Abridgement::StubToolResults.new(keep_rounds: bad) }
+    end
+  end
+
   def test_stub_contains_tool_name_address_and_char_count
     convo = long_tool_result_conversation
     original_text = convo.element(3).content["text"]

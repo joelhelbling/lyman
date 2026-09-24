@@ -114,7 +114,9 @@ Two policies ship, plus two combinators:
   address is exactly what the recall tool (issue #12) will need to
   re-expand it, so abridging a tool result is a wire-time compression, not
   a decision to forget it. A stub is only used when it's actually shorter
-  than the original text; a `nil` result is left as is.
+  than the original text; a `nil` result is left as is. `keep_rounds` must be at least 1 —
+  a result with no reply after it is one the model hasn't seen yet, so
+  stubbing it would leave the model acting on a stub it can't expand.
 - `Lyman::Abridgement.chain(*policies)` returns a lambda that applies
   policies left to right, so composing reductions is just listing them.
 - `Lyman::Abridgement.over_budget(max_prompt_tokens, policy)` returns a

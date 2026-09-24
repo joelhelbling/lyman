@@ -214,6 +214,82 @@ class ChatCompletionTest < Minitest::Test
     assert_equal convo.element(4).content["text"], result.element(4).content["text"]
   end
 
+  # Like start_fake_server, but answers one request per entry in
+  # +responses+, in order — for circuits that make several model calls.
+  def start_fake_server_sequence(captured_bodies, responses)
+    server = TCPServer.new("127.0.0.1", 0)
+    port = server.addr[1]
+
+    thread = Thread.new do
+      responses.each do |response_bytes|
+        client = server.accept
+        client.gets # request line
+        headers = {}
+        while (line = client.gets) && line != "\r\n"
+          key, value = line.split(":", 2)
+          headers[key.strip.downcase] = value.strip
+        end
+        content_length = headers["content-length"].to_i
+        captured_bodies << JSON.parse(client.read(content_length))
+        client.write(response_bytes)
+        client.close
+      end
+      server.close
+    end
+
+    ["http://127.0.0.1:#{port}", thread]
+  end
+
+  def reply_with_prompt_tokens(prompt_tokens)
+    http_response({
+      "choices" => [{"message" => {"role" => "assistant", "content" => "ok"}}],
+      "usage" => {"prompt_tokens" => prompt_tokens, "completion_tokens" => 1, "total_tokens" => prompt_tokens + 1}
+    }.to_json)
+  end
+
+  # The flagship composition: usage stamped by round N gates the wire of
+  # round N+1. Also pins the documented lag — the report describes the
+  # request as sent, so once the abridged prompt comes back under budget
+  # the gate turns itself off again the round after.
+  def test_over_budget_gates_the_next_round_on_the_usage_this_round_stamped
+    captured = []
+    base_url, thread = start_fake_server_sequence(captured, [
+      reply_with_prompt_tokens(500), # over budget: next round abridges
+      reply_with_prompt_tokens(50),  # abridged prompt fits: next round doesn't
+      reply_with_prompt_tokens(500)
+    ])
+
+    long_result = "a very long tool result, " + ("filler " * 40)
+    convo = Lyman::Conversation.new(system_prompt: "be terse")
+      .with_assistant_message({
+        "role" => "assistant",
+        "content" => nil,
+        "tool_calls" => [{"id" => "call_1", "type" => "function", "function" => {"name" => "current_time", "arguments" => "{}"}}]
+      })
+      .with_tool_result("call_1", long_result)
+      .with_assistant_message({"role" => "assistant", "content" => "done"})
+
+    abridgement = Lyman::Abridgement.over_budget(100, Lyman::Abridgement::StubToolResults.new(keep_rounds: 1))
+    worker = Lyman::Workers.chat_completion(base_url: base_url, model: "test-model", abridgement: abridgement)
+    rounds = []
+    pipeline = source_worker { rounds.shift } | worker
+
+    3.times do |turn|
+      rounds << convo.with_user_message("question #{turn}")
+      convo = pipeline.shift
+    end
+    thread.join(5)
+
+    tool_contents = captured.map { |body| body["messages"].find { |m| m["role"] == "tool" }["content"] }
+    assert_equal long_result, tool_contents[0] # no usage yet: gate can't fire
+    assert_match(/\A\[abridged: current_time result/, tool_contents[1])
+    assert_equal long_result, tool_contents[2] # last report was under budget
+    assert_operator JSON.generate(captured[1]).bytesize, :<, JSON.generate(captured[0]).bytesize
+
+    assert_equal 500, convo.prompt_tokens
+    assert_equal long_result, convo.element(4).content["text"] # series untouched throughout
+  end
+
   def test_a_plain_lambda_works_as_an_abridgement_policy
     captured = []
     base_url, thread = start_fake_server(captured, http_response(non_streaming_response_json))

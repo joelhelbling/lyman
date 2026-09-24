@@ -52,8 +52,17 @@ module Lyman
     # original element's address, so a future recall tool (issue #12) can
     # re-expand exactly what was shrunk. Stubbing never makes a result
     # longer: a result already shorter than its own stub is left alone.
+    #
+    # keep_rounds must be at least 1: a result with no reply after it is
+    # one the model hasn't seen yet, and stubbing it would have the model
+    # act on "[abridged: ...]" with no way (until recall exists) to see
+    # what it asked for.
     class StubToolResults
       def initialize(keep_rounds: 2)
+        unless keep_rounds.is_a?(Integer) && keep_rounds >= 1
+          raise ArgumentError, "keep_rounds must be an Integer >= 1 (got #{keep_rounds.inspect}): " \
+            "a result the model hasn't replied to yet can't be abridged"
+        end
         @keep_rounds = keep_rounds
       end
 
