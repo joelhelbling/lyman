@@ -42,13 +42,29 @@ module Lyman
         # lib/lyman/tools/, named `<tool>_tool` here. `wire:` is the
         # expression a harness lists in its TOOLS to hand the tool to the
         # model — harnesses are owned, so `add` advises the line rather
-        # than editing it in.
+        # than editing it in. `needs:` names other artifacts a tool expects
+        # to be planted alongside it (a keyword dependency its factory
+        # can't do without); `add` only *advises* planting them, never
+        # plants them itself — the dependency is duck-typed, so a user may
+        # wire in their own object instead of the registry's artifact.
         "current_time_tool" => {
           source: "lib/lyman/tools/current_time.rb",
           dest: "lib/lyman/tools/current_time.rb",
           role: :managed,
           wire: "Lyman::Tools.current_time",
           description: "Tool: the current local date and time — the demo tool the harnesses start with"
+        },
+        # optional: true because it needs a store, which a fresh scaffold
+        # doesn't have — reach it with `lyman add recall_tool` once `store`
+        # is planted (or wire it to a hand-rolled duck-typed store).
+        "recall_tool" => {
+          source: "lib/lyman/tools/recall.rb",
+          dest: "lib/lyman/tools/recall.rb",
+          role: :managed,
+          optional: true,
+          needs: ["store"],
+          wire: "Lyman::Tools.recall(store: store)",
+          description: "Tool: re-expands abridged or compacted context by address or search (docs/design/context-control.md)"
         },
         # `optional:` keeps `new` from planting these — a SQLite
         # native-extension dependency shouldn't be presumed on a fresh

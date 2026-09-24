@@ -39,6 +39,23 @@ class NewTest < Minitest::Test
     end
   end
 
+  # recall_tool is optional (it needs a store), so it isn't planted by
+  # `new` — plant it with `add` to prove it's self-contained too: no
+  # requires of sibling lyman files, so it can be planted/updated/ejected
+  # alone, same guarantee as current_time.rb above.
+  def test_planted_recall_tool_is_self_contained
+    in_tmpdir do
+      project = scaffold_project
+      Dir.chdir(project) { run_cli("add", "recall_tool") }
+      script = 'require "./lib/lyman/tools/recall"; ' \
+        "fake_store = Object.new; " \
+        'print Lyman::Tools.recall(store: fake_store)[:schema].dig("function", "name")'
+      out = IO.popen([RbConfig.ruby, "-e", script], chdir: project, &:read)
+
+      assert_equal "recall", out
+    end
+  end
+
   # Guards against a harness referencing a tool `new` never plants: every
   # Lyman::Tools.<x> this repo's own harnesses list must have a matching
   # registry artifact (by `wire:`) that isn't optional.

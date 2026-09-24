@@ -253,4 +253,46 @@ class AddTest < Minitest::Test
       end
     end
   end
+
+  def test_new_does_not_plant_recall_tool
+    in_tmpdir do
+      project = scaffold_project
+
+      refute File.exist?(File.join(project, "lib/lyman/tools/recall.rb"))
+      manifest = Lyman::CLI::Manifest.load(project)
+      assert_nil manifest.artifact("recall_tool")
+    end
+  end
+
+  def test_add_recall_tool_plants_it_wiring_advice_and_needs_advice_when_store_missing
+    in_tmpdir do
+      scaffold_project("demo")
+      Dir.chdir("demo") do
+        result = run_cli("add", "recall_tool")
+
+        assert_equal 0, result.status
+        assert File.exist?("lib/lyman/tools/recall.rb")
+        manifest = Lyman::CLI::Manifest.load(Dir.pwd)
+        assert_equal "managed", manifest.artifact("recall_tool")["status"]
+        assert_includes result.out, "not wired"
+        assert_includes result.out, "Lyman::Tools.recall(store: store)"
+        assert_includes result.out, "recall_tool expects store"
+        assert_includes result.out, "lyman add store"
+      end
+    end
+  end
+
+  def test_add_recall_tool_gives_no_needs_advice_when_store_already_planted
+    in_tmpdir do
+      scaffold_project("demo")
+      Dir.chdir("demo") do
+        run_cli("add", "store")
+
+        result = run_cli("add", "recall_tool")
+
+        assert_equal 0, result.status
+        refute_includes result.out, "expects store"
+      end
+    end
+  end
 end

@@ -48,10 +48,17 @@ end
 A **factory, not a constant**, for two reasons: it mirrors the
 `Lyman::Workers.*` factories already in the codebase (one paradigm, not a
 second convention for tools), and keyword arguments are where a tool's
-dependencies go — the upcoming recall tool is `Lyman::Tools.recall(store:
-store)`. Each tool file is self-contained (no requires of sibling lyman
-files), so it can be planted, updated, or ejected on its own; stdlib only
-per tool file unless its registry entry declares `gems:`.
+dependencies go — the recall tool (`lib/lyman/tools/recall.rb`, issue #12;
+see docs/design/context-control.md, "Store and recall") is the first tool
+with one, `Lyman::Tools.recall(store: store)`. Its `store:` is duck-typed
+(anything answering `fetch`/`search`), so the tool file stays
+self-contained and stdlib-only even though its purpose is to read back
+from a store. Each tool file is self-contained (no requires of sibling
+lyman files), so it can be planted, updated, or ejected on its own;
+stdlib only per tool file unless its registry entry declares `gems:`.
+Registered as `recall_tool` with `needs: ["store"]` — see the registry
+entry's comments for what `needs:` means and why `add` only advises
+rather than plants a needed artifact.
 
 **The harness lists its tools explicitly.** No auto-registration: what the
 model can call must be visible in the wiring script (guts on the outside),

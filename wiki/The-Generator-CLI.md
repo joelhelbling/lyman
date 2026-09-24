@@ -84,6 +84,7 @@ module the harness merely wires together.
 | `current_time_tool` | `Lyman::Tools.current_time` — the demo tool the harnesses start with, one file under `lib/lyman/tools/` — managed, planted by `new` |
 | `store` | `Lyman::Store` — SQLite conversation persistence with lineage and full-text search; the only file that knows `sqlite3` exists — managed, opt-in: `lyman add store` |
 | `store_append` | the `side_worker` that splices a `store` into a circuit — managed, opt-in: `lyman add store_append` |
+| `recall_tool` | `Lyman::Tools.recall(store:)` — re-expands abridged or compacted context by address or search — managed, opt-in: `lyman add recall_tool` (needs `store`) |
 | `claude_md` | guidance for coding agents working in your project — owned |
 | `claude_skill` | the same guidance as a Claude Code skill, for projects that already have a `CLAUDE.md` lyman shouldn't clobber — opt-in |
 
@@ -93,7 +94,11 @@ module the harness merely wires together.
 follow the same advise-don't-edit rule for wiring: `lyman add <name>_tool`
 plants the tool file and, if no harness already mentions it, reminds you
 to add its factory call to your harness's `TOOLS` array — harnesses are
-owned, so lyman won't edit them for you.
+owned, so lyman won't edit them for you. A tool can also depend on another
+artifact (`recall_tool` needs `store`, since `Lyman::Tools.recall` takes
+`store:`): `lyman add recall_tool` prints the same kind of reminder —
+`lyman add store` — if the dependency isn't planted yet, since it's
+duck-typed and you might wire in your own object instead.
 
 ## `lyman doctor`
 
