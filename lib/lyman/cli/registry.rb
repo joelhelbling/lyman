@@ -38,6 +38,21 @@ module Lyman
           role: :managed,
           description: "Wire-time abridgement policies: deterministic context reduction, no model needed"
         },
+        # The compaction vocabulary and its feed: stdlib only, so planted
+        # unconditionally, like abridgement. The sidecar that uses them
+        # (compactor, below) is the opt-in part.
+        "compaction" => {
+          source: "lib/lyman/compaction.rb",
+          dest: "lib/lyman/compaction.rb",
+          role: :managed,
+          description: "Compaction ledger and request protocol: model-built, lineage-linked context reduction"
+        },
+        "compaction_feed" => {
+          source: "lib/lyman/workers/compaction_feed.rb",
+          dest: "lib/lyman/workers/compaction_feed.rb",
+          role: :managed,
+          description: "Side worker: feeds each new element to a compaction sidecar's inbox"
+        },
         # Tools (docs/design/tools-and-agents.md): one file per tool under
         # lib/lyman/tools/, named `<tool>_tool` here. `wire:` is the
         # expression a harness lists in its TOOLS to hand the tool to the
@@ -110,6 +125,22 @@ module Lyman
           role: :owned,
           optional: true,
           description: "The script archetype: take one work item at launch, process it, halt"
+        },
+        # Not a fourth archetype but a daemon-archetype shell that runs in a
+        # thread beside a root harness (docs/design/context-control.md). It
+        # has no `wire:` — splicing it in touches the circuit and the shell
+        # loop, not a TOOLS array — so `advice:` points at its own header.
+        # Owned: its digest instructions and model *are* the compaction
+        # strategy, and a different strategy is a different copy of it.
+        "compactor" => {
+          source: "harness/compactor.rb",
+          dest: "harness/compactor.rb",
+          role: :owned,
+          optional: true,
+          needs: ["compaction", "compaction_feed"],
+          advice: "Wire it into a harness: see the comment at the top of harness/compactor.rb " \
+            "(a thread, one side worker in the circuit, one conditional in the shell loop).",
+          description: "Compaction sidecar: a threaded daemon shell keeping a ledger, so compaction is a handoff, not a stall"
         },
         # The repl's display layer, one artifact per widget so ownership —
         # and any drift `lyman diff` reports — stays per-file, not per-blob.
