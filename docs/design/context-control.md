@@ -148,7 +148,9 @@ search from inside a compacted conversation still finds material that was
 compacted away. `lineage(id)` returns the ancestor chain
 (`[id, parent, grandparent, …]`) that both `search` and, later, the
 recall tool walk. `load(id)` rebuilds a full `Lyman::Conversation` from
-its stored elements.
+its stored elements. Only the series and its lineage are durable: a loaded
+conversation starts with fresh control state (`rounds` 0, not finished),
+ready for a new user message — a turn isn't resumable mid-turn.
 
 `parent_id` therefore lives on `Conversation` itself (default `nil`), not
 bolted onto the store schema alone — it's the compaction lineage pointer
@@ -225,7 +227,11 @@ What it costs, stated plainly:
   protocol. Both are new kinds of thing in a codebase that has so far been
   single-threaded and single-model.
 - **A SQLite dependency.** Confined to one worker, but the first
-  native-extension gem in the plantable set.
+  native-extension gem in the plantable set. And because the planted
+  entry point (`lib/lyman.rb`) requires every planted module, planting the
+  store means nothing loads — harness or `lyman doctor` — until the client
+  Gemfile gains `sqlite3` and `bundle install` runs. `lyman add store`
+  says so up front.
 
 ## Order of work
 

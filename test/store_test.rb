@@ -75,6 +75,10 @@ class StoreTest < Minitest::Test
     assert_nil store.element(convo.id, 99)
     assert_equal %w[user assistant], store.elements(convo.id, 2..3).map(&:type)
     assert_equal %w[system user], store.elements(convo.id, 1...3).map(&:type)
+    # Endless and beginless ranges agree with Conversation#elements_in.
+    [2.., 2..., ..2, ...2].each do |range|
+      assert_equal convo.elements_in(range).map(&:seq), store.elements(convo.id, range).map(&:seq), range.inspect
+    end
   ensure
     store.close
   end
@@ -135,8 +139,7 @@ class StoreTest < Minitest::Test
     convo = Lyman::Conversation.new.with_user_message("what's the time?")
     store.append(convo)
 
-    result = store.search("what's the time?")
-    refute_nil result
+    assert_equal 1, store.search("what's the time?").size
   ensure
     store.close
   end
