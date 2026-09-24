@@ -32,6 +32,12 @@ module Lyman
           role: :managed,
           description: "Relay worker: executes pending tool calls"
         },
+        "abridgement" => {
+          source: "lib/lyman/abridgement.rb",
+          dest: "lib/lyman/abridgement.rb",
+          role: :managed,
+          description: "Wire-time abridgement policies: deterministic context reduction, no model needed"
+        },
         # `optional:` keeps `new` from planting these — a SQLite
         # native-extension dependency shouldn't be presumed on a fresh
         # scaffold; reach it with `lyman add store`. `gems:` names gem

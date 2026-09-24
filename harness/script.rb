@@ -58,10 +58,15 @@ conversation = Lyman::Conversation.new(
 )
 rounds = [] # the circuit's queue — visible right here, not smuggled
 
+# ── Context policy: what each round shows the model ─────────────────────────
+# The conversation keeps every element; this only shapes the wire projection.
+# Swap, chain (Lyman::Abridgement.chain), or drop it — nil sends everything.
+abridgement = Lyman::Abridgement::StubToolResults.new(keep_rounds: 2)
+
 # ── The circuit ─────────────────────────────────────────────────────────────
 pipeline =
   source_worker { rounds.shift } |
-  Lyman::Workers.chat_completion(base_url: BASE_URL, model: MODEL, tools: schemas) |
+  Lyman::Workers.chat_completion(base_url: BASE_URL, model: MODEL, tools: schemas, abridgement: abridgement) |
   relay_worker { |c|
     (c.pending_tool_calls.empty? || c.runaway?) ? c.finish : c
   } |
