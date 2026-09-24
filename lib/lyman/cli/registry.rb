@@ -69,6 +69,22 @@ module Lyman
           wire: "Lyman::Tools.current_time",
           description: "Tool: the current local date and time — the demo tool the harnesses start with"
         },
+        # Plain handlers, no model (docs/design/tools-and-agents.md, "File
+        # access") — stdlib only, so planted by default like current_time.
+        "search_files_tool" => {
+          source: "lib/lyman/tools/search_files.rb",
+          dest: "lib/lyman/tools/search_files.rb",
+          role: :managed,
+          wire: "Lyman::Tools.search_files(root: Dir.pwd)",
+          description: "Tool: search a tree by file content and/or name/glob, root-confined"
+        },
+        "read_file_tool" => {
+          source: "lib/lyman/tools/read_file.rb",
+          dest: "lib/lyman/tools/read_file.rb",
+          role: :managed,
+          wire: "Lyman::Tools.read_file(root: Dir.pwd)",
+          description: "Tool: read a file (optionally by line range) with line numbers, root-confined"
+        },
         # optional: true because it needs a store, which a fresh scaffold
         # doesn't have — reach it with `lyman add recall_tool` once `store`
         # is planted (or wire it to a hand-rolled duck-typed store).

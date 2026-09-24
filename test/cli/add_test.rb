@@ -248,6 +248,85 @@ class AddTest < Minitest::Test
     end
   end
 
+  def test_add_search_files_tool_gives_no_wiring_advice_when_a_harness_mentions_it
+    in_tmpdir do
+      scaffold_project("demo")
+      Dir.chdir("demo") do
+        manifest = Lyman::CLI::Manifest.load(Dir.pwd)
+        manifest.delete_artifact("search_files_tool")
+        manifest.save
+        FileUtils.rm_f("lib/lyman/tools/search_files.rb")
+        # harness/repl.rb (planted by `new`) already lists Lyman::Tools.search_files.
+        assert_includes File.read("harness/repl.rb"), "Lyman::Tools.search_files"
+
+        result = run_cli("add", "search_files_tool")
+
+        assert_equal 0, result.status
+        refute_includes result.out, "not wired"
+      end
+    end
+  end
+
+  def test_add_search_files_tool_advises_wiring_when_no_harness_mentions_it
+    in_tmpdir do
+      scaffold_project("demo")
+      Dir.chdir("demo") do
+        manifest = Lyman::CLI::Manifest.load(Dir.pwd)
+        manifest.delete_artifact("search_files_tool")
+        manifest.save
+        FileUtils.rm_f("lib/lyman/tools/search_files.rb")
+        contents = File.read("harness/repl.rb").gsub("Lyman::Tools.search_files(root: Dir.pwd)", "# removed for this test")
+        File.write("harness/repl.rb", contents)
+
+        result = run_cli("add", "search_files_tool")
+
+        assert_equal 0, result.status
+        assert File.exist?("lib/lyman/tools/search_files.rb")
+        assert_includes result.out, "not wired"
+        assert_includes result.out, "Lyman::Tools.search_files"
+      end
+    end
+  end
+
+  def test_add_read_file_tool_gives_no_wiring_advice_when_a_harness_mentions_it
+    in_tmpdir do
+      scaffold_project("demo")
+      Dir.chdir("demo") do
+        manifest = Lyman::CLI::Manifest.load(Dir.pwd)
+        manifest.delete_artifact("read_file_tool")
+        manifest.save
+        FileUtils.rm_f("lib/lyman/tools/read_file.rb")
+        assert_includes File.read("harness/repl.rb"), "Lyman::Tools.read_file"
+
+        result = run_cli("add", "read_file_tool")
+
+        assert_equal 0, result.status
+        refute_includes result.out, "not wired"
+      end
+    end
+  end
+
+  def test_add_read_file_tool_advises_wiring_when_no_harness_mentions_it
+    in_tmpdir do
+      scaffold_project("demo")
+      Dir.chdir("demo") do
+        manifest = Lyman::CLI::Manifest.load(Dir.pwd)
+        manifest.delete_artifact("read_file_tool")
+        manifest.save
+        FileUtils.rm_f("lib/lyman/tools/read_file.rb")
+        contents = File.read("harness/repl.rb").gsub("Lyman::Tools.read_file(root: Dir.pwd)", "# removed for this test")
+        File.write("harness/repl.rb", contents)
+
+        result = run_cli("add", "read_file_tool")
+
+        assert_equal 0, result.status
+        assert File.exist?("lib/lyman/tools/read_file.rb")
+        assert_includes result.out, "not wired"
+        assert_includes result.out, "Lyman::Tools.read_file"
+      end
+    end
+  end
+
   def test_readd_over_tombstone_prompts_and_force_restores_managed_status
     in_tmpdir do
       scaffold_project("demo")
