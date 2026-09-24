@@ -1,8 +1,8 @@
 # Design note: fine-grained control of context
 
-**Status:** accepted direction; parts 1 (elements, issue #8), 2 (store,
-issue #9), 3 (abridgement, issue #10), and 5 (recall tool, issue #12) are
-implemented. Part 4 (compaction sidecar, issue #11) is not done yet.
+**Status:** accepted direction; all five parts are implemented — 1
+(elements, issue #8), 2 (store, issue #9), 3 (abridgement, issue #10), 4
+(compaction sidecar, issue #11), and 5 (recall tool, issue #12).
 **Tracked by:** the "context control" GitHub issues (elements, store,
 abridgement, compaction sidecar, recall tool)
 
@@ -199,6 +199,123 @@ in until an abridgement policy or a compaction is deemed necessary; the
 transport's `usage` report is the natural input for that decision, and
 "over budget?" is a clean whether-to-act stage.
 
+### How it's built
+
+Three pieces, split along the line between what lyman *manages* and what
+the developer *owns*:
+
+- **`Lyman::Workers.compaction_feed(inbox)`**
+  (`lib/lyman/workers/compaction_feed.rb`) — the side worker. A
+  conversation passes through the circuit once per round carrying every
+  element so far, so the worker remembers (in closure state) how far into
+  each conversation it has fed and pushes only the new elements onto
+  `inbox`, a `Thread::Queue`. Spliced where `store_append` goes: after
+  `tool_execution`, before the finished filter.
+- **`Lyman::Compaction`** (`lib/lyman/compaction.rb`, stdlib only) — the
+  vocabulary: a `Ledger` value, a `Request` value, and
+  `Compaction.request(inbox, conversation)`. Managed and planted by `lyman
+  new`, like `Abridgement`.
+- **`harness/compactor.rb`** — the sidecar shell itself, an *owned* wiring
+  script defining `run_compactor(inbox, base_url:, model:)`, which a root
+  harness runs in a `Thread`. Its digest instructions, its model, and what
+  it does with each batch are the compaction strategy, so it's the
+  developer's to edit — and an alternate strategy is an alternate copy of
+  this file. Opt-in: `lyman add compactor`.
+
+**The ledger** is an immutable value, like `Conversation`: `entries` (each
+`{"kind" => "fact" | "decision" | "open" | "gap", "text" => ...,
+"sources" => [addresses]}`) and `covered` (conversation id ⇒ the highest
+seq accounted for). Entries are only ever appended. For each batch,
+`ledger.prompt(batch, instructions:)` builds a conversation for the digest
+model — the current ledger, then the new elements numbered `[1]`, `[2]`, …
+(a small model copies back `3` far more reliably than a 36-character
+UUID) — and `ledger.absorb(batch, reply)` reads the reply's JSON array
+back, mapping those local numbers onto element addresses. System prompts
+aren't digested (they travel verbatim), nor is reasoning (scratch work),
+nor anything `covered` already accounts for. A reply that can't be read,
+or a model call that failed outright, becomes one `gap` entry citing the
+whole batch: a bad digest costs a summary, never a backlink.
+
+**The protocol** needs no locks. Elements and `Request`s ride the same
+inbox, so by the time the sidecar reads a request it has read every
+element fed before it. The sidecar blocks for one arrival, then takes
+whatever else is already waiting (batches size themselves to how far
+behind it is), and splits the arrivals at each request: elements before a
+request are digested first, then `ledger.compact(conversation)` builds the
+compacted conversation and it goes back on the request's reply queue.
+`Compaction.request` waits on that queue with a timeout (default 120s)
+and falls back to the conversation as given, so a dead or wedged sidecar
+costs a missed compaction, never a hung root shell. The digest circuit is
+rebuilt per batch because an error raised inside a shifty pipeline ends
+it, and the sidecar must outlive a flaky model call.
+
+**The compacted conversation** gets a fresh id, `parent_id` set to the
+conversation it compacted, and fresh control state (`rounds` 0, `usage`
+nil — so the same stale report can't retrigger compaction). Its first
+element is the original system prompt with the rendered ledger appended
+under a fixed heading, sources compressed into the range addresses
+`Store#fetch` and the recall tool accept (`conv:abc#3-5`). One system
+message rather than two, because many local chat templates reject a
+second. Compacting a compaction replaces the ledger below that heading
+rather than stacking a second copy (the new ledger already carries every
+older entry). Then the verbatim tail: the last turn, from its user
+message on, reasoning dropped. The sidecar then `cover`s the conversation
+it handed back, so its opening — ledger plus tail, already accounted
+for — isn't fed back through the digest model as news when the root
+circuit starts feeding it.
+
+Wiring it into a root harness is a thread, one side worker, and one
+conditional — the rest stays as it was:
+
+```ruby
+require_relative "compactor"
+
+COMPACT_AT = 6000 # prompt tokens — leave headroom below the real window
+compactor_inbox = Thread::Queue.new
+compactor = Thread.new { run_compactor(compactor_inbox, base_url: BASE_URL, model: MODEL) }
+
+pipeline =
+  source_worker { rounds.shift } |
+  Lyman::Workers.chat_completion(base_url: BASE_URL, model: MODEL, tools: schemas) |
+  relay_worker { |c| (c.pending_tool_calls.empty? || c.runaway?) ? c.finish : c } |
+  Lyman::Workers.tool_execution(handlers) |
+  Lyman::Workers.compaction_feed(compactor_inbox) |
+  side_worker { |c| rounds << c unless c.finished? } |
+  filter_worker { |c| c.finished? }
+
+# in the shell loop:
+rounds << conversation.with_user_message(input)
+conversation = pipeline.shift
+if conversation.prompt_tokens.to_i > COMPACT_AT
+  conversation = Lyman::Compaction.request(compactor_inbox, conversation)
+end
+```
+
+Compaction is requested between turns, never mid-turn: the tail is "the
+most recent turn", and a shell that rebinds between turns never has to
+reach into a circuit that's still running. Splice in `store_append` and
+hand the model the recall tool as well, and every backlink in the ledger
+is something the root model can re-expand — the store walks the
+`parent_id` chain the compaction left behind.
+
+What a live run against local models showed (gemma4 as the root model,
+llama3.2 3B digesting): the first compaction took ~14s, because it paid
+for loading the digest model cold plus the digest backlog; later ones
+took well under a second, since the ledger was already current. Ledger
+quality is the digest model's quality, so a 3B model produces some
+filler entries alongside the useful ones.
+
+Known limits, left for later strategies rather than built in now:
+
+- **The ledger only grows.** Entries are appended, never merged or
+  retired, so a very long session's ledger eventually becomes its own
+  context problem. Consolidation (periodically re-digesting the ledger
+  itself) is a natural next strategy — as another copy of the compactor
+  script.
+- **One ledger per sidecar.** The ledger follows whatever the feed sends
+  it; a daemon that starts a fresh conversation per event wants either
+  no compactor or one sidecar per conversation.
+
 ## Store and recall
 
 `Lyman::Store` (`lib/lyman/store.rb`) is the persistent side of the
@@ -351,7 +468,9 @@ What it costs, stated plainly:
 - **A second model and a thread.** The compactor needs a fast model running
   alongside the main one, and a thread with a request-and-handoff
   protocol. Both are new kinds of thing in a codebase that has so far been
-  single-threaded and single-model.
+  single-threaded and single-model — which is why the sidecar is opt-in
+  (`lyman add compactor`), and the planted harnesses stay single-threaded
+  until a developer splices it in.
 - **A SQLite dependency.** Confined to one worker, but the first
   native-extension gem in the plantable set. And because the planted
   entry point (`lib/lyman.rb`) requires every planted module, planting the
@@ -367,5 +486,5 @@ What it costs, stated plainly:
    (issue #9).
 3. Wire-time abridgement policies, plus usage stamping so a policy can
    gate on context pressure. **Done** (issue #10).
-4. Compaction sidecar.
+4. Compaction sidecar. **Done** (issue #11).
 5. Recall tool. **Done** (issue #12).
