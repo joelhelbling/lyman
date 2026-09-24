@@ -156,6 +156,22 @@ class AddTest < Minitest::Test
     end
   end
 
+  def test_add_compactor_plants_the_sidecar_shell_and_points_at_its_wiring
+    in_tmpdir do
+      scaffold_project("demo")
+      Dir.chdir("demo") do
+        result = run_cli("add", "compactor")
+
+        assert_equal 0, result.status
+        assert File.exist?("harness/compactor.rb")
+        manifest = Lyman::CLI::Manifest.load(Dir.pwd)
+        assert_equal "owned", manifest.artifact("compactor")["status"]
+        assert_includes result.out, "see the comment at the top of harness/compactor.rb"
+        refute_includes result.out, "expects", "compaction and compaction_feed are planted by `new`"
+      end
+    end
+  end
+
   def test_add_store_append_plants_the_worker
     in_tmpdir do
       scaffold_project("demo")

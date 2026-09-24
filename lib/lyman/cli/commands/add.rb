@@ -47,6 +47,7 @@ module Lyman
           advise_on_gems(name, spec, project_root)
           advise_on_wiring(name, spec, project_root)
           advise_on_needs(name, spec, manifest)
+          @thor.say spec[:advice] if spec[:advice]
         end
 
         private
