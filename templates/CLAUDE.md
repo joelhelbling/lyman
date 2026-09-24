@@ -70,9 +70,13 @@ workers in your own namespace or directory, not inside `lib/lyman/`.
    (multi-way dispatch) — split it into stages, or use a splitter, instead.
 
 5. **Wire vs. conversation.** Reasoning elements stay on the `Conversation`
-   for observability, but `Conversation#wire_messages` strips them before
-   anything goes out over the wire. Preserve that separation if you touch
-   message handling.
+   for observability, but `Conversation#wire_messages` strips them by
+   default — it rides the wire only when you opt in with
+   `chat_completion(..., send_reasoning: true)`, for interleaved-thinking
+   models. Preserve that separation if you touch message handling.
+   Abridgement policies (`Lyman::Abridgement`, planted by `lyman new`) go
+   further: they shape the wire *view* `chat_completion` builds, but never
+   alter the element series itself — nothing abridged away is gone.
 
 ## Other conventions
 

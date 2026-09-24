@@ -113,6 +113,14 @@ pipeline. Point it elsewhere with `LYMAN_BASE_URL` and `LYMAN_MODEL`.
   `side_worker` that wires it into a circuit. Neither is planted by
   `lyman new` — add them with `lyman add store` when a harness needs to
   survive a restart or be queried.
+- **Context management is a wiring choice, not a mode.** `Lyman::Abridgement`
+  ships deterministic, model-free policies — `SuppressPriorReasoning`,
+  `StubToolResults` — that shape only the *wire view* `chat_completion`
+  sends; the element series is untouched, so nothing abridged away is gone.
+  A policy is a plain object (`call(conversation) -> conversation`, lambdas
+  welcome) picked when wiring the chat completion worker, and
+  `Abridgement.over_budget` can gate one on the transport's own `usage`
+  report, stamped onto the conversation after each reply.
 
 The longer story — mission, principles, architecture decisions, open
 questions — is in [docs/vision.md](docs/vision.md).
@@ -191,7 +199,8 @@ touched at all: it's yours from day one.
 Early and moving. What exists today: the vision, circuit-pattern,
 harness-archetypes, and deployment design docs, the core `Conversation` item
 (an append-only element series), chat-completion and tool-execution workers,
-an optional SQLite `Store` with lineage and full-text search, the three
+an optional SQLite `Store` with lineage and full-text search, deterministic
+wire-time `Abridgement` policies plus transport usage stamping, the three
 archetype harnesses (repl, daemon, script) working against live local
 models, and the generator CLI (`new` / `add` / `update` / `eject` / `diff` /
 `doctor` / `list`) with a Minitest suite behind it. Published to
