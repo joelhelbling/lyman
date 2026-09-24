@@ -47,7 +47,10 @@ module Lyman
         if on_delta
           payload["stream"] = true
           # Streaming responses otherwise omit usage entirely; this asks
-          # the server to append it to the final chunk.
+          # the server to append it to the final chunk. It's the standard
+          # OpenAI field (Ollama, llama.cpp, vLLM, LM Studio honor it); a
+          # strict server that rejects unknown fields would fail here — eject
+          # chat_completion (`lyman eject`) and drop this line if yours does.
           payload["stream_options"] = {"include_usage" => true}
         end
 

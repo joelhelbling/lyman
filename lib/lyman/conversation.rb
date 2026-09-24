@@ -48,8 +48,8 @@ module Lyman
   #
   # The OpenAI-compatible message list is a *projection* of the series
   # (`messages` / `wire_messages`), not the storage form: elements are
-  # regrouped back into wire messages on demand, reasoning stripped for
-  # the wire but kept in the series for observability.
+  # regrouped back into wire messages on demand, reasoning stripped from
+  # the wire by default but always kept in the series for observability.
   #
   # An immutable value. Shifty 0.6 deep-freezes every value at a worker
   # boundary (the :frozen handoff policy), so change is expressed as new
