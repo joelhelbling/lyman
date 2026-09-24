@@ -38,7 +38,8 @@ source of truth for intent; this file is a summary plus working conventions.
   the user, so lyman advises rather than edits it. The `sqlite3` gem is
   already in this repo's own `Gemfile`, for the store's tests and harness use.
   `lyman add recall_tool` plants the recall tool and advises `lyman add store`
-  too if a store isn't already planted.
+  too if a store isn't already planted. `lyman add compactor` plants the
+  compaction sidecar shell and points at the wiring comment at its top.
 
 ## Layout
 
@@ -50,7 +51,11 @@ source of truth for intent; this file is a summary plus working conventions.
   wire-time projection policies: `SuppressPriorReasoning`,
   `StubToolResults`, `chain`, `over_budget`), `Workers` (factories like
   `chat_completion`, `tool_execution`, and `store_append`, the
-  `side_worker` that splices a `Store` into a circuit), and `Tools`
+  `side_worker` that splices a `Store` into a circuit, and
+  `compaction_feed`, the side worker that hands each new element to a
+  compaction sidecar), `Compaction` (`compaction.rb` — the `Ledger` value
+  and the `Request`/`Compaction.request` handoff protocol a compaction
+  sidecar is built from; stdlib only), and `Tools`
   (`lib/lyman/tools/` — one file per tool, each a factory
   `Lyman::Tools.<name>(**deps)` returning `{schema:, handler:}`, mirroring
   the `Workers` factories; `current_time` is the managed demo tool `lyman
@@ -60,7 +65,8 @@ source of truth for intent; this file is a summary plus working conventions.
   projects — one copy, kept alive by use. `Store` and `store_append` are
   managed but optional: `lyman new` doesn't plant them, `lyman add store` /
   `lyman add store_append` do. `Abridgement` is managed but not optional —
-  stdlib only, so `lyman new` plants it unconditionally.
+  stdlib only, so `lyman new` plants it unconditionally. The same goes for
+  `Compaction` and `compaction_feed`; the sidecar that uses them is opt-in.
 - `lib/lyman/cli/` — generator machinery (Thor CLI, registry, manifest,
   planter). Never planted into client projects. The boundary between what
   lyman *does* (this directory) and what it *installs* is the registry,
@@ -82,7 +88,10 @@ source of truth for intent; this file is a summary plus working conventions.
   in a `TOOLS = [Lyman::Tools.current_time, ...]` array — no
   auto-registration, since what the model can call must stay visible in
   the wiring script and some tools need dependencies only the harness
-  holds.
+  holds. `harness/compactor.rb` is not a fourth archetype: it's a
+  daemon-archetype shell (`run_compactor`) that a root harness runs in a
+  thread — owned and opt-in (`lyman add compactor`), since its digest
+  instructions and model are the compaction strategy.
 - `test/` — Minitest suite for the generator CLI.
 - `docs/` — vision and design notes. Design decisions get written down here.
 

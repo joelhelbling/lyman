@@ -4,6 +4,21 @@
 
 ### Added
 
+- **The compaction sidecar** (`lyman add compactor`): a daemon-archetype
+  shell (`harness/compactor.rb`, owned) that runs in its own thread beside
+  a root harness and keeps a ledger of the conversation current with a
+  small fast model — so compaction, when the shell asks for it with
+  `Lyman::Compaction.request(inbox, conversation)`, is a drain and a
+  handoff rather than a summarization stall. The ledger's entries (facts,
+  decisions, open items) cite the addresses of the elements they
+  summarize; the compacted conversation is the system prompt plus the
+  ledger, then the last turn verbatim, with `parent_id` pointing at the
+  original. `Lyman::Workers.compaction_feed(inbox)` is the sidecar's one
+  side worker in the root circuit. `Lyman::Compaction` and
+  `compaction_feed` are stdlib-only and planted by `lyman new`; the
+  sidecar itself is opt-in. Registry entries gained `advice:` — a line
+  `add` prints after planting. Closes part 4 of the context-control
+  design (issue #11).
 - **The recall tool** (`lyman add recall_tool`): `Lyman::Tools.recall(store:,
   max_chars: 8000)` lets the model re-expand context an abridgement policy
   or a compaction ledger entry compressed away, by element address

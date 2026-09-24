@@ -121,6 +121,15 @@ pipeline. Point it elsewhere with `LYMAN_BASE_URL` and `LYMAN_MODEL`.
   welcome) picked when wiring the chat completion worker, and
   `Abridgement.over_budget` can gate one on the transport's own `usage`
   report, stamped onto the conversation after each reply.
+- **Compaction is a handoff, not a stall.** A compaction sidecar
+  (`harness/compactor.rb`, `lyman add compactor`) is a daemon-archetype
+  shell running in its own thread beside your harness: one side worker,
+  `Lyman::Workers.compaction_feed`, hands it each new element, and a small
+  fast model keeps a ledger — facts, decisions, open items, each citing the
+  addresses of the elements it summarizes. When the shell decides context
+  is too big, `Lyman::Compaction.request` hands back a new conversation
+  (ledger plus the last turn verbatim, `parent_id` pointing at the
+  original) almost instantly, because the ledger was already current.
 - **Over-compaction is recoverable, not fatal.** `Lyman::Tools.recall(store:)`
   lets the model re-expand what a stub or a ledger entry points at — by
   address (`conv:abc#17-23`) or by plain-word search — bounded so a wide

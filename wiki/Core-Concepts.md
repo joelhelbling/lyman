@@ -93,8 +93,8 @@ so re-appending a growing conversation never duplicates rows. Reading
 back mirrors element addressing: `store.fetch("conv:abc#17-23")` and
 `store.search("timezone bug")` both return `Element`s, and `search`
 given a `conversation_id` follows `lineage` up through ancestor
-conversations too — the same chain a future compaction step will use to
-recover what a ledger entry summarized.
+conversations too — the same chain a compaction's ledger entries point
+back along.
 
 ### Abridgement: shaping the wire view, not the history
 
@@ -126,6 +126,45 @@ Lyman::Workers.chat_completion(base_url:, model:, tools:, abridgement:)
 ```
 
 `nil` (the default) sends everything, unabridged.
+
+### Compaction: a sidecar shell keeping a ledger
+
+Where abridgement is free and forgetful-for-one-call, **compaction** uses a
+model and produces a new conversation. The usual way to compact —
+summarize everything, then start over — happens at the worst moment and
+blocks the turn. Lyman prepares it continuously instead: the **compaction
+sidecar** (`harness/compactor.rb`, planted with `lyman add compactor`) is
+a daemon-archetype shell running in its own thread beside your harness.
+
+- **Its footprint in your circuit is one side worker.**
+  `Lyman::Workers.compaction_feed(inbox)` pushes each new element onto a
+  `Thread::Queue`. Shifty's frozen handoffs are what make sharing those
+  elements across threads safe without locks.
+- **It keeps a ledger, not a prose summary.** A small, fast model digests
+  each batch of elements into entries — facts established, decisions
+  taken, open items — and every entry cites the addresses of the elements
+  it came from. The ledger is only ever appended to, so it stays stable as
+  it grows.
+- **Asking for compaction is a handoff.** When your shell decides context
+  is too big (the conversation's `prompt_tokens` is the natural input),
+  `Lyman::Compaction.request(inbox, conversation)` gets back a new
+  conversation: your system prompt with the ledger appended, then the last
+  turn verbatim, and `parent_id` pointing at the original. The shell
+  rebinds and carries on.
+
+```ruby
+compactor_inbox = Thread::Queue.new
+compactor = Thread.new { run_compactor(compactor_inbox, base_url: BASE_URL, model: MODEL) }
+# in the circuit, before the finished filter:
+Lyman::Workers.compaction_feed(compactor_inbox) |
+# in the shell loop, after the turn comes back:
+conversation = Lyman::Compaction.request(compactor_inbox, conversation) if conversation.prompt_tokens.to_i > COMPACT_AT
+```
+
+The compactor script is yours: its digest instructions and model *are*
+the compaction strategy, and a different strategy is a different copy of
+that file, not a mode. Add a store and the recall tool, and anything the
+ledger summarized can be re-expanded from its addresses.
 
 ### Item-as-control, and its discipline
 

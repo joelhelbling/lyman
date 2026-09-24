@@ -36,6 +36,15 @@ shapes — see the [Harness Archetypes wiki page](https://github.com/joelhelblin
 To build a new harness, start from the archetype whose shell shape matches
 — the circuit rarely needs to change; the supplier of work items does.
 
+A long-running harness can also run a **compaction sidecar**
+(`lyman add compactor`, `harness/compactor.rb`): a daemon-archetype shell in
+its own thread that keeps a ledger of the conversation with a small model,
+fed by one side worker (`Lyman::Workers.compaction_feed`). When the shell
+decides context is too big, `Lyman::Compaction.request` hands back a
+compacted conversation (ledger plus the last turn, `parent_id` set). The
+wiring is in the comment at the top of that file; its digest instructions
+and model are the compaction strategy and yours to change.
+
 ## Adding a tool
 
 A tool is one file holding a factory that returns `{schema:, handler:}`
