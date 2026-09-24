@@ -82,6 +82,8 @@ module the harness merely wires together.
 | `tool_execution` | executes pending tool calls — managed |
 | `abridgement` | `Lyman::Abridgement` — deterministic, model-free wire-time context reduction — managed, planted by `new` |
 | `current_time_tool` | `Lyman::Tools.current_time` — the demo tool the harnesses start with, one file under `lib/lyman/tools/` — managed, planted by `new` |
+| `search_files_tool` | `Lyman::Tools.search_files(root:)` — literal, case-insensitive content search, or file-name/glob lookup with no pattern — managed, planted by `new` |
+| `read_file_tool` | `Lyman::Tools.read_file(root:)` — line-numbered file reads, optionally by range — managed, planted by `new` |
 | `store` | `Lyman::Store` — SQLite conversation persistence with lineage and full-text search; the only file that knows `sqlite3` exists — managed, opt-in: `lyman add store` |
 | `store_append` | the `side_worker` that splices a `store` into a circuit — managed, opt-in: `lyman add store_append` |
 | `recall_tool` | `Lyman::Tools.recall(store:)` — re-expands abridged or compacted context by address or search — managed, opt-in: `lyman add recall_tool` (needs `store`) |

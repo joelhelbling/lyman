@@ -59,8 +59,11 @@ source of truth for intent; this file is a summary plus working conventions.
   (`lib/lyman/tools/` — one file per tool, each a factory
   `Lyman::Tools.<name>(**deps)` returning `{schema:, handler:}`, mirroring
   the `Workers` factories; `current_time` is the managed demo tool `lyman
-  new` plants, `recall` (`store:`) re-expands abridged or compacted
-  context and is managed but optional, since it needs a store). These files are
+  new` plants, `search_files` and `read_file` (both `root:`) are the file
+  primitives and are managed but not optional — `lyman new` plants them
+  too, stdlib only, like `current_time` — and `recall` (`store:`)
+  re-expands abridged or compacted context and is managed but optional,
+  since it needs a store). These files are
   both what this repo runs and what the generator plants into client
   projects — one copy, kept alive by use. `Store` and `store_append` are
   managed but optional: `lyman new` doesn't plant them, `lyman add store` /

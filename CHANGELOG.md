@@ -4,6 +4,24 @@
 
 ### Added
 
+- **File primitives** (`Lyman::Tools.search_files(root:, max_hits: 100)`,
+  `Lyman::Tools.read_file(root:, max_chars: 20_000)`): plain handlers, no
+  model, stdlib only, planted by `lyman new` alongside `current_time`.
+  `search_files` matches a literal, case-insensitive `pattern` against file
+  contents (returning `path:LINE: text` hits), or without a `pattern` lists
+  matching paths by name, restrictable by `glob` or `path`; it skips binary
+  files and dotfiles/dotdirs and caps output at `max_hits` with a
+  truncation note. `read_file` returns line-numbered text, optionally by
+  `start_line`/`end_line`, truncating on a line boundary with a hint naming
+  the next `start_line`. Both confine every path to `root` by resolving it
+  with `File.realpath`, refusing `..` traversal and symlinks that point
+  outside it, and never raise on bad model input — every failure (missing
+  file, escape attempt, binary content) comes back as a message string.
+  `harness/repl.rb` lists both in `TOOLS`; the daemon and script harnesses
+  don't, since giving a TCP-listening or scripted harness file access
+  should be the owner's deliberate choice. These are the primitives the
+  upcoming file reader agent (#16) will be built from. Closes part 3 of
+  the tools-and-agents design (issue #15).
 - **The compaction sidecar** (`lyman add compactor`): a daemon-archetype
   shell (`harness/compactor.rb`, owned) that runs in its own thread beside
   a root harness and keeps a ledger of the conversation current with a

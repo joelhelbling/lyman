@@ -1,7 +1,7 @@
 # Design note: tools, and agents as tools
 
 **Status:** accepted direction; part 1 (plantable tools convention, issue
-#13) is implemented
+#13) and part 3 (file primitives, issue #15) are implemented
 **Tracked by:** the "tools" GitHub issues (tools convention, agent-as-tool,
 file primitives, file reader agent, patch tool, patch agent)
 
@@ -105,6 +105,19 @@ of it.
   matching on content; returns paths with line hits.
 - `read_file` — read a file, optionally by line range.
 
+Both landed as `Lyman::Tools.search_files(root:)` and
+`Lyman::Tools.read_file(root:)` (issue #15), confined to `root` by
+resolving existing paths with `File.realpath`, so `..` traversal and symlinks
+pointing outside it are refused. `search_files`' `pattern` is a literal,
+case-insensitive substring — not a regex, since small models write poor
+ones — and matching is on content; with no `pattern` it falls back to
+listing matching paths by name, so the same tool covers "find this text"
+and "find this file". `read_file` returns line-numbered text so the model
+can cite a location and ask for more by `start_line`/`end_line`. Neither
+raises on bad model input (missing file, escape attempt, binary content) —
+every failure comes back as a message string the model can read and act
+on, rather than an exception the circuit has to handle.
+
 **The reader agent** takes a path or glob plus an optional query, uses the
 primitives, and returns only what was asked. To avoid one agent that
 switches on file type (the multi-way dispatch anti-pattern from
@@ -180,7 +193,9 @@ What it costs, stated plainly:
 
 1. Plantable tools convention. **Done** (issue #13).
 2. Agent-as-tool pattern.
-3. File primitives.
+3. File primitives. **Done** (issue #15) — landed before #2, so the
+   agent-as-tool pattern will be built around a real sub-agent working
+   real tools rather than a hypothetical.
 4. File reader agent.
 5. Patch tool.
 6. Patch agent.
