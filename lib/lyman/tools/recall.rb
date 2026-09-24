@@ -39,7 +39,8 @@ module Lyman
                 },
                 "conversation_id" => {
                   "type" => "string",
-                  "description" => "Optional: scopes `query` to this conversation and its ancestors."
+                  "description" => "Optional: scopes `query` to this conversation and its ancestors " \
+                    "(a bare id or a conv:ID address)."
                 },
                 "limit" => {
                   "type" => "integer",
@@ -66,12 +67,18 @@ module Lyman
         # SQLite reads a negative LIMIT as unlimited; clamp so a sloppy or
         # huge value can't turn into an unbounded scan.
         limit = (Integer(args["limit"] || DEFAULT_LIMIT, exception: false) || DEFAULT_LIMIT).clamp(1, MAX_LIMIT)
-        elements = store.search(query, conversation_id: conversation_id, limit: limit)
+        elements = store.search(query, conversation_id: bare_conversation_id(conversation_id), limit: limit)
       else
         return "Pass either address (e.g. \"conv:abc#17-23\") or query (plain words) to recall."
       end
 
-      return "Nothing found for #{address ? address.inspect : query.inspect}." if elements.empty?
+      if elements.empty?
+        return "Nothing found for #{address.inspect}." if address
+        # Every word must match, so one stray or misspelled word sinks the
+        # whole query — say so, or a small model just keeps rephrasing.
+        return "Nothing found for #{query.inspect}. Every word must match: try one or two distinctive " \
+          "words, or pass the address from an [abridged: ...] stub as address."
+      end
 
       render(elements, max_chars: max_chars)
     end
@@ -91,8 +98,21 @@ module Lyman
     end
     private_class_method :presence
 
+    # Models hand back what they've seen, and what they've seen are
+    # addresses — so accept "conv:ID" or "conv:ID#17" as a conversation_id
+    # too, rather than scoping the search to a lineage that doesn't exist.
+    def self.bare_conversation_id(value)
+      value&.delete_prefix("conv:")&.sub(/#.*\z/, "")
+    end
+    private_class_method :bare_conversation_id
+
+    ADDRESS_IN_TEXT = /conv:[^\s#\]]+(?:#\d+(?:-\d+)?)?/
+
+    # Seen live: a model passing the whole "[abridged: ... — conv:ID#6]" stub
+    # as the address. If the argument isn't an address but contains one,
+    # use the one it contains.
     def self.fetch(address, store:)
-      store.fetch(address)
+      store.fetch(address[ADDRESS_IN_TEXT] || address)
     rescue ArgumentError
       "Malformed address #{address.inspect} — expected \"conv:ID\", \"conv:ID#17\", or \"conv:ID#17-23\"."
     end
