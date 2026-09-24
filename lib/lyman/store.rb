@@ -59,19 +59,21 @@ module Lyman
       @db.get_first_row("SELECT id, parent_id, created_at FROM conversations WHERE id = ?", [id])
     end
 
+    # Accepts any Range Conversation#elements_in does — bounded, endless
+    # (2..), beginless (..5), inclusive or exclusive — so the stored and
+    # in-memory views of a series answer the same questions the same way.
     def elements(conversation_id, range = nil)
-      rows = if range
-        @db.execute(
-          "SELECT * FROM elements WHERE conversation_id = ? AND seq BETWEEN ? AND ? ORDER BY seq",
-          [conversation_id, range.begin, range.exclude_end? ? range.end - 1 : range.end]
-        )
-      else
-        @db.execute(
-          "SELECT * FROM elements WHERE conversation_id = ? ORDER BY seq",
-          [conversation_id]
-        )
+      sql = "SELECT * FROM elements WHERE conversation_id = ?"
+      binds = [conversation_id]
+      if range&.begin
+        sql += " AND seq >= ?"
+        binds << range.begin
       end
-      rows.map { |row| to_element(row) }
+      if range&.end
+        sql += range.exclude_end? ? " AND seq < ?" : " AND seq <= ?"
+        binds << range.end
+      end
+      @db.execute("#{sql} ORDER BY seq", binds).map { |row| to_element(row) }
     end
 
     def element(conversation_id, seq)
@@ -99,8 +101,10 @@ module Lyman
       end
     end
 
-    # Plain-word search: query is treated as literal words, not FTS syntax,
-    # so punctuation like "what's the time?" can't raise. Each token is
+    # Plain-word search: query is treated as words, not FTS syntax, so
+    # punctuation like "what's the time?" can't raise. (Each quoted token
+    # still runs through FTS5's tokenizer, so "what's" matches as the
+    # phrase "what s".) Each token is
     # quoted (with embedded quotes doubled) and the tokens are ANDed —
     # FTS5's implicit behavior for adjacent quoted strings.
     def search(query, conversation_id: nil, limit: 20)
@@ -147,6 +151,9 @@ module Lyman
       rows.map { |row| row["id"] }
     end
 
+    # Only the series and its lineage are durable; rounds and finished are
+    # a turn's transient control state, so a loaded conversation starts
+    # fresh — ready for a new user message, not resumable mid-turn.
     def load(conversation_id)
       row = conversation(conversation_id)
       return nil unless row

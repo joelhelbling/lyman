@@ -55,7 +55,8 @@ module Lyman
         def advise_on_gems(name, spec, project_root)
           (spec[:gems] || []).each do |gem_name|
             next if gemfile_mentions?(project_root, gem_name)
-            @thor.say "#{name} needs the #{gem_name} gem: add gem \"#{gem_name}\" to your Gemfile and run bundle install."
+            @thor.say "#{name} needs the #{gem_name} gem: add gem \"#{gem_name}\" to your Gemfile and run bundle install. " \
+              "Until then lib/lyman.rb won't load (it requires every planted module), so neither will your harness or `lyman doctor`."
           end
         end
 
