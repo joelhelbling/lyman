@@ -55,9 +55,7 @@ module Lyman
     end
 
     def self.handle(args, store:, max_chars:)
-      # Small models often send every parameter, blanking the ones they
-      # don't mean — treat an empty string as absent.
-      address, query = args.values_at("address", "query").map { |v| v.to_s.strip.empty? ? nil : v }
+      address, query, conversation_id = args.values_at("address", "query", "conversation_id").map { |v| presence(v) }
 
       if address && query
         return "Pass exactly one of address or query, not both."
@@ -65,8 +63,10 @@ module Lyman
         elements = fetch(address, store: store)
         return elements if elements.is_a?(String)
       elsif query
-        limit = Integer(args["limit"] || 10, exception: false) || 10
-        elements = store.search(query, conversation_id: args["conversation_id"], limit: limit)
+        # SQLite reads a negative LIMIT as unlimited; clamp so a sloppy or
+        # huge value can't turn into an unbounded scan.
+        limit = (Integer(args["limit"] || DEFAULT_LIMIT, exception: false) || DEFAULT_LIMIT).clamp(1, MAX_LIMIT)
+        elements = store.search(query, conversation_id: conversation_id, limit: limit)
       else
         return "Pass either address (e.g. \"conv:abc#17-23\") or query (plain words) to recall."
       end
@@ -76,6 +76,20 @@ module Lyman
       render(elements, max_chars: max_chars)
     end
     private_class_method :handle
+
+    DEFAULT_LIMIT = 10
+    MAX_LIMIT = 50
+
+    # Small models often send every parameter, blanking the ones they
+    # don't mean — treat an empty string as absent, for every parameter
+    # alike, so the next one added can't be left behind. A blank
+    # conversation_id passed through would scope the search to a lineage
+    # of nothing and report "Nothing found" for a query that would hit.
+    def self.presence(value)
+      string = value.to_s.strip
+      string.empty? ? nil : string
+    end
+    private_class_method :presence
 
     def self.fetch(address, store:)
       store.fetch(address)
@@ -93,11 +107,22 @@ module Lyman
       # the abridgement was protecting — truncate and tell the model how
       # to ask again more narrowly, rather than silently overflowing.
       truncated = full[0, max_chars]
-      first, last = elements.first, elements.last
-      example = "conv:#{first.conversation_id}##{first.seq}-#{[first.seq + 2, last.seq].min}"
-      "#{truncated}\n\n[recall truncated at #{max_chars} chars — narrow the range, e.g. #{example}]"
+      "#{truncated}\n\n[recall truncated at #{max_chars} chars — #{narrower_hint(elements)}]"
     end
     private_class_method :render
+
+    # Suggest a range strictly narrower than the one that overflowed — a
+    # small model will likely repeat the example verbatim, so echoing the
+    # failed request back would just loop. A single element has nothing
+    # narrower to offer; say so instead.
+    def self.narrower_hint(elements)
+      return "this single element is longer than the cap" if elements.size == 1
+
+      first = elements.first
+      last_seq = [first.seq + (elements.size / 2) - 1, first.seq].max
+      "narrow the range, e.g. conv:#{first.conversation_id}##{first.seq}-#{last_seq}"
+    end
+    private_class_method :narrower_hint
 
     def self.render_element(element)
       "[#{element.address} #{element.type}]\n#{element_text(element)}"

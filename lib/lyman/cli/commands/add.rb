@@ -94,11 +94,13 @@ module Lyman
         # duck-typed, so lyman can't just plant it for you — you might be
         # wiring in your own object. It only advises, the same
         # don't-edit-what-you-don't-own posture as the Gemfile and wiring
-        # advice above.
+        # advice above. An ejected artifact counts as present: eject leaves
+        # the file in place, so the dependency is still satisfied at runtime,
+        # and re-adding it would offer to replace the user's fork.
         def advise_on_needs(name, spec, manifest)
           (spec[:needs] || []).each do |needed|
             status = manifest.artifact(needed)&.fetch("status", nil)
-            next if %w[managed owned].include?(status)
+            next if %w[managed owned ejected].include?(status)
             @thor.say "#{name} expects #{needed}: run `lyman add #{needed}` " \
               "(or wire in your own object with the same interface)."
           end
