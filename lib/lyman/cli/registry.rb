@@ -38,6 +38,18 @@ module Lyman
           role: :managed,
           description: "Wire-time abridgement policies: deterministic context reduction, no model needed"
         },
+        # Tools (docs/design/tools-and-agents.md): one file per tool under
+        # lib/lyman/tools/, named `<tool>_tool` here. `wire:` is the
+        # expression a harness lists in its TOOLS to hand the tool to the
+        # model — harnesses are owned, so `add` advises the line rather
+        # than editing it in.
+        "current_time_tool" => {
+          source: "lib/lyman/tools/current_time.rb",
+          dest: "lib/lyman/tools/current_time.rb",
+          role: :managed,
+          wire: "Lyman::Tools.current_time",
+          description: "Tool: the current local date and time — the demo tool the harnesses start with"
+        },
         # `optional:` keeps `new` from planting these — a SQLite
         # native-extension dependency shouldn't be presumed on a fresh
         # scaffold; reach it with `lyman add store`. `gems:` names gem

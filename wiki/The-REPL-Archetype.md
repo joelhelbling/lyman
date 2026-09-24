@@ -89,7 +89,9 @@ never knew it existed.
 
 ## Making it yours
 
-- **Add tools** in the `TOOLS` hash — schema and handler side by side.
+- **Add tools** by writing a factory returning `{schema:, handler:}` in
+  your own directory (or `lyman add <name>_tool` for a shipped one) and
+  listing its call in the `TOOLS` array.
 - **Change the personality** in the `system_prompt`.
 - **Persist the conversation** with a `side_worker` after the model call
   that appends to a file or database — durability is a splice, not a

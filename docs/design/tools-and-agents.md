@@ -1,6 +1,7 @@
 # Design note: tools, and agents as tools
 
-**Status:** accepted direction (pre-implementation)
+**Status:** accepted direction; part 1 (plantable tools convention, issue
+#13) is implemented
 **Tracked by:** the "tools" GitHub issues (tools convention, agent-as-tool,
 file primitives, file reader agent, patch tool, patch agent)
 
@@ -18,6 +19,66 @@ Tools keep the shape the harness already uses — schema and handler side by
 side, guts on the outside — but move to one file per tool, declared in the
 registry like any other plantable artifact, and picked up by the harness.
 This comes before any particular tool.
+
+**One file per tool, a factory per file.** `lib/lyman/tools/<name>.rb`
+defines a factory method on `module Lyman::Tools` that returns the same
+`{schema:, handler:}` shape the harness used to write inline, string keys
+throughout:
+
+```ruby
+module Lyman
+  module Tools
+    def self.current_time
+      {
+        schema: {
+          "type" => "function",
+          "function" => {
+            "name" => "current_time",
+            "description" => "Returns the current local date and time",
+            "parameters" => {"type" => "object", "properties" => {}, "required" => []}
+          }
+        },
+        handler: ->(_args) { Time.now.strftime("%Y-%m-%d %H:%M:%S %Z") }
+      }
+    end
+  end
+end
+```
+
+A **factory, not a constant**, for two reasons: it mirrors the
+`Lyman::Workers.*` factories already in the codebase (one paradigm, not a
+second convention for tools), and keyword arguments are where a tool's
+dependencies go — the upcoming recall tool is `Lyman::Tools.recall(store:
+store)`. Each tool file is self-contained (no requires of sibling lyman
+files), so it can be planted, updated, or ejected on its own; stdlib only
+per tool file unless its registry entry declares `gems:`.
+
+**The harness lists its tools explicitly.** No auto-registration: what the
+model can call must be visible in the wiring script (guts on the outside),
+and some tools need dependencies only the harness holds. Each harness
+lists its tools as an explicit array of factory calls:
+
+```ruby
+# ── Tools: one file each in lib/lyman/tools/, schema and handler side by side ─
+# `lyman add <name>_tool` plants more; list them here to hand them to the model.
+TOOLS = [
+  Lyman::Tools.current_time
+]
+
+schemas = TOOLS.map { |tool| tool[:schema] }
+handlers = TOOLS.to_h { |tool| [tool[:schema].dig("function", "name"), tool[:handler]] }
+```
+
+**Registry entries are named `<name>_tool`**, each with a `wire:` string —
+the expression a harness lists in `TOOLS` to hand the tool to the model.
+Because harnesses are owned, `lyman add <name>_tool` plants the tool file
+but never edits the harness; it advises the wiring line instead, the same
+way `lyman add store` advises the `Gemfile` line rather than editing it.
+
+**Hand-written tools keep the shape, not the location.** `lib/lyman/` is
+managed, so a client project's own tools live in its own namespace and
+directory (e.g. `lib/tools/weather.rb`, `Tools.weather`), required by the
+harness and listed in the same `TOOLS` array.
 
 ## An agent-as-tool is a script shell inside a handler
 
@@ -110,7 +171,7 @@ What it costs, stated plainly:
 
 ## Order of work
 
-1. Plantable tools convention.
+1. Plantable tools convention. **Done** (issue #13).
 2. Agent-as-tool pattern.
 3. File primitives.
 4. File reader agent.

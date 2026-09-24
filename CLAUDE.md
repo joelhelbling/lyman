@@ -46,9 +46,13 @@ source of truth for intent; this file is a summary plus working conventions.
   `sqlite3` gem; persists conversations with lineage and a full-text
   index), `Abridgement` (`abridgement.rb` — deterministic, model-free
   wire-time projection policies: `SuppressPriorReasoning`,
-  `StubToolResults`, `chain`, `over_budget`), and `Workers` (factories like
+  `StubToolResults`, `chain`, `over_budget`), `Workers` (factories like
   `chat_completion`, `tool_execution`, and `store_append`, the
-  `side_worker` that splices a `Store` into a circuit). These files are
+  `side_worker` that splices a `Store` into a circuit), and `Tools`
+  (`lib/lyman/tools/` — one file per tool, each a factory
+  `Lyman::Tools.<name>(**deps)` returning `{schema:, handler:}`, mirroring
+  the `Workers` factories; `current_time` is the managed demo tool `lyman
+  new` plants). These files are
   both what this repo runs and what the generator plants into client
   projects — one copy, kept alive by use. `Store` and `store_append` are
   managed but optional: `lyman new` doesn't plant them, `lyman add store` /
@@ -71,7 +75,11 @@ source of truth for intent; this file is a summary plus working conventions.
   `harness/repl/`, one file per widget, each registered as its own owned
   artifact; the daemon and script stay stdlib-only. Harnesses load local
   files with `require_relative` — they use the files in `lib/`, not the
-  lyman gem.
+  lyman gem. Each harness lists the tools it hands to the model explicitly
+  in a `TOOLS = [Lyman::Tools.current_time, ...]` array — no
+  auto-registration, since what the model can call must stay visible in
+  the wiring script and some tools need dependencies only the harness
+  holds.
 - `test/` — Minitest suite for the generator CLI.
 - `docs/` — vision and design notes. Design decisions get written down here.
 

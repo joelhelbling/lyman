@@ -25,6 +25,36 @@ class NewTest < Minitest::Test
     end
   end
 
+  # Each tool file is self-contained (no requires of sibling lyman files),
+  # so it can be planted/updated/ejected alone — this proves current_time.rb
+  # doesn't quietly depend on something the manifest doesn't track.
+  def test_planted_current_time_tool_is_self_contained
+    in_tmpdir do
+      project = scaffold_project
+      script = 'require "./lib/lyman/tools/current_time"; ' \
+        'print Lyman::Tools.current_time[:schema].dig("function", "name")'
+      out = IO.popen([RbConfig.ruby, "-e", script], chdir: project, &:read)
+
+      assert_equal "current_time", out
+    end
+  end
+
+  # Guards against a harness referencing a tool `new` never plants: every
+  # Lyman::Tools.<x> this repo's own harnesses list must have a matching
+  # registry artifact (by `wire:`) that isn't optional.
+  def test_every_harness_tool_reference_has_a_default_registry_artifact
+    tools_wired = Lyman::CLI::Registry::ARTIFACTS.values.filter_map { |spec| spec[:wire] }
+    default_wired = Lyman::CLI::Registry.default.values.filter_map { |spec| spec[:wire] }
+
+    Dir.glob(File.join(Lyman::CLI::Registry::GEM_ROOT, "harness", "*.rb")).each do |path|
+      referenced = File.read(path).scan(/Lyman::Tools\.\w+/).uniq
+      referenced.each do |wire|
+        assert_includes tools_wired, wire, "expected #{wire} (referenced in #{path}) to be a registry artifact's wire:"
+        assert_includes default_wired, wire, "expected #{wire} (referenced in #{path}) to be planted by default"
+      end
+    end
+  end
+
   def test_skips_optional_artifacts
     in_tmpdir do
       project = scaffold_project
