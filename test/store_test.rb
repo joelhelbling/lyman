@@ -220,6 +220,21 @@ class StoreTest < Minitest::Test
     store.close
   end
 
+  def test_load_gives_fresh_control_state_including_nil_usage
+    store = Lyman::Store.new(":memory:")
+    original = Lyman::Conversation.new(system_prompt: "sp")
+      .with_user_message("hi")
+      .with_assistant_message({"role" => "assistant", "content" => "hello"})
+      .with_usage({"prompt_tokens" => 42})
+    store.append(original)
+
+    loaded = store.load(original.id)
+
+    assert_nil loaded.usage
+  ensure
+    store.close
+  end
+
   def test_load_unknown_id_returns_nil
     store = Lyman::Store.new(":memory:")
     assert_nil store.load("unknown")

@@ -64,13 +64,18 @@ rounds = [] # the circuit's queue — visible right here, not smuggled
 printer = RoundPrinter.new(MODEL)
 tool_printer = ToolPrinter.new
 
+# ── Context policy: what each round shows the model ─────────────────────────
+# The conversation keeps every element; this only shapes the wire projection.
+# Swap, chain (Lyman::Abridgement.chain), or drop it — nil sends everything.
+abridgement = Lyman::Abridgement::StubToolResults.new(keep_rounds: 2)
+
 # ── The circuit ─────────────────────────────────────────────────────────────
 pipeline =
   source_worker { rounds.shift } |
   side_worker { |_c| printer.start_round } |
   Lyman::Workers.chat_completion(
     base_url: BASE_URL, model: MODEL, tools: schemas,
-    on_delta: printer.method(:delta)
+    on_delta: printer.method(:delta), abridgement: abridgement
   ) |
   side_worker { |_c| printer.finish_round } |
   relay_worker { |c|

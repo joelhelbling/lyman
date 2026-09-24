@@ -60,16 +60,22 @@ module Lyman
   #
   # Messages and element content use string keys throughout, for clean
   # round-tripping with OpenAI-compatible wire formats.
-  class Conversation < Data.define(:id, :parent_id, :elements, :rounds, :max_rounds, :finished)
+  class Conversation < Data.define(:id, :parent_id, :elements, :rounds, :max_rounds, :finished, :usage)
     # parent_id is the compaction lineage pointer: a compacted conversation
     # names the conversation it compacted, so a store can walk the ancestor
     # chain to recall what an over-aggressive compaction dropped. nil for an
     # ordinary conversation with no ancestor. See docs/design/context-control.md
     # ("Two kinds of reduction, kept apart").
-    def initialize(system_prompt: nil, id: nil, parent_id: nil, elements: nil, rounds: 0, max_rounds: 10, finished: false)
+    #
+    # usage is the transport's raw usage hash from the most recent model
+    # reply (string keys, e.g. {"prompt_tokens"=>..., "completion_tokens"=>...,
+    # "total_tokens"=>...}), or nil when unreported. It's control data, not
+    # series — a store persists the elements, never this — so a conversation
+    # loaded back from storage starts with usage nil, same as rounds/finished.
+    def initialize(system_prompt: nil, id: nil, parent_id: nil, elements: nil, rounds: 0, max_rounds: 10, finished: false, usage: nil)
       id ||= SecureRandom.uuid
       elements ||= system_prompt ? [Element.new(conversation_id: id, seq: 1, type: "system", content: {"text" => system_prompt})] : []
-      super(id: id, parent_id: parent_id, elements: elements, rounds: rounds, max_rounds: max_rounds, finished: finished)
+      super(id: id, parent_id: parent_id, elements: elements, rounds: rounds, max_rounds: max_rounds, finished: finished, usage: usage)
     end
 
     def with_user_message(text)
@@ -109,6 +115,23 @@ module Lyman
       with(elements: elements + [next_element("tool_result", {"tool_call_id" => tool_call_id, "text" => content})])
     end
 
+    # Stamps the transport's usage report from the reply that just landed.
+    # chat_completion calls this after with_assistant_message on every
+    # round, streamed or not, so "over budget?" always has the freshest
+    # figure to consult (see Abridgement.over_budget).
+    def with_usage(usage)
+      with(usage: usage)
+    end
+
+    # The transport's prompt token count from the most recent reply, or
+    # nil when usage was never reported. This lags one request behind —
+    # it describes the request that just returned, not the one about to
+    # be sent — so it's an approximation a whether-to-act stage consults,
+    # not a hard guarantee.
+    def prompt_tokens
+      usage && usage["prompt_tokens"]
+    end
+
     # The projection back to OpenAI-style message hashes, reasoning kept
     # (it's useful to observability): a reasoning element immediately
     # preceding an assistant element becomes that message's "reasoning"
@@ -146,11 +169,16 @@ module Lyman
     end
 
     # The conversation keeps each element's reasoning (it's useful to
-    # observability), but it never rides back to the model: providers
-    # either ignore it, reject it outright (DeepSeek), or would burn
-    # context re-reading thoughts the model already finished thinking.
-    def wire_messages
-      messages.map { |message| message.except("reasoning") }
+    # observability), but by default it never rides back to the model:
+    # providers either ignore it, reject it outright (DeepSeek), or would
+    # burn context re-reading thoughts the model already finished thinking.
+    #
+    # reasoning: true is the opt-in for interleaved-thinking models (e.g.
+    # gpt-oss, qwen3) that want the current turn's chain of thought back
+    # between tool calls — pair it with Abridgement::SuppressPriorReasoning
+    # so only the current turn's reasoning survives to ride along.
+    def wire_messages(reasoning: false)
+      reasoning ? messages : messages.map { |message| message.except("reasoning") }
     end
 
     def element(seq)

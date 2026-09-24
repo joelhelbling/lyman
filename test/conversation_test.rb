@@ -231,6 +231,48 @@ class ConversationTest < Minitest::Test
     assert_equal %w[user assistant], convo.elements_in(2..3).map(&:type)
   end
 
+  def test_usage_defaults_to_nil
+    assert_nil Lyman::Conversation.new.usage
+  end
+
+  def test_with_usage_sets_usage
+    convo = Lyman::Conversation.new.with_usage({"prompt_tokens" => 42})
+
+    assert_equal({"prompt_tokens" => 42}, convo.usage)
+  end
+
+  def test_prompt_tokens_reads_from_usage
+    convo = Lyman::Conversation.new.with_usage({"prompt_tokens" => 42, "total_tokens" => 60})
+
+    assert_equal 42, convo.prompt_tokens
+  end
+
+  def test_prompt_tokens_nil_when_usage_unreported
+    assert_nil Lyman::Conversation.new.prompt_tokens
+  end
+
+  def test_with_user_message_keeps_usage
+    convo = Lyman::Conversation.new.with_usage({"prompt_tokens" => 42})
+    updated = convo.with_user_message("hello")
+
+    assert_equal({"prompt_tokens" => 42}, updated.usage)
+  end
+
+  def test_wire_messages_strips_reasoning_by_default
+    convo = Lyman::Conversation.new
+      .with_assistant_message({"role" => "assistant", "reasoning" => "thinking", "content" => "reply"})
+
+    convo.wire_messages.each { |m| refute m.key?("reasoning") }
+  end
+
+  def test_wire_messages_reasoning_true_includes_reasoning
+    convo = Lyman::Conversation.new
+      .with_assistant_message({"role" => "assistant", "reasoning" => "thinking", "content" => "reply"})
+
+    message = convo.wire_messages(reasoning: true).find { |m| m["role"] == "assistant" }
+    assert_equal "thinking", message["reasoning"]
+  end
+
   def test_frozen_handoffs_survive_a_shifty_pipeline
     handlers = {
       "known" => ->(args) { "handled #{args["x"]}" },
