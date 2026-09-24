@@ -13,6 +13,10 @@ module Lyman
   # This file is the stdlib-only vocabulary the sidecar is built from; the
   # sidecar itself is a wiring script (harness/compactor.rb), because a
   # compaction strategy is a choice of wiring, not a mode of a component.
+  #
+  # The client's lib/lyman.rb loads planted files alphabetically, so this
+  # one loads before conversation.rb: refer to Conversation and Element
+  # only inside method bodies, never at load time.
   module Compaction
     # How a root shell asks the sidecar for a compacted conversation: the
     # conversation to compact, and a queue to hand the result back on.
@@ -24,11 +28,17 @@ module Lyman
     # Enqueues a compaction request and waits for the compacted
     # conversation. Falls back to the conversation as given if the sidecar
     # doesn't answer within +timeout+ seconds (a dead or wedged compactor
-    # thread must cost a missed compaction, never a hung root shell).
+    # thread must cost a missed compaction, never a hung root shell) — and
+    # says so, so a stall reads as "compaction is broken" rather than "the
+    # app is slow".
     def self.request(inbox, conversation, timeout: 120)
       reply = Thread::Queue.new
       inbox << Request.new(conversation: conversation, reply: reply)
-      reply.pop(timeout: timeout) || conversation
+      compacted = reply.pop(timeout: timeout)
+      return compacted if compacted
+
+      warn "compaction: no answer from the sidecar within #{timeout}s; continuing uncompacted"
+      conversation
     end
 
     # The running summary a compactor keeps: entries, each a string-keyed
