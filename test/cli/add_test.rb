@@ -295,4 +295,21 @@ class AddTest < Minitest::Test
       end
     end
   end
+
+  # Eject leaves store.rb in place, so recall's dependency is still met at
+  # runtime; advising `lyman add store` would lead to a fork-replacement prompt.
+  def test_add_recall_tool_gives_no_needs_advice_when_store_ejected
+    in_tmpdir do
+      scaffold_project("demo")
+      Dir.chdir("demo") do
+        run_cli("add", "store")
+        run_cli("eject", "store")
+
+        result = run_cli("add", "recall_tool")
+
+        assert_equal 0, result.status
+        refute_includes result.out, "expects store"
+      end
+    end
+  end
 end

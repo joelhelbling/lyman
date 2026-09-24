@@ -210,9 +210,52 @@ class RecallTest < Minitest::Test
     result = tool[:handler].call({"address" => "conv:#{convo.id}#1-2"})
 
     assert_includes result, "recall truncated at 50 chars"
-    assert_includes result, "narrow the range"
+    assert_includes result, "narrow the range, e.g. conv:#{convo.id}#1-1"
   ensure
     store.close
+  end
+
+  # Echoing back the range that just overflowed would invite a small model
+  # to repeat it; a single oversized element has nothing narrower to offer.
+  def test_truncation_of_a_single_element_says_so_instead_of_suggesting_a_range
+    store = Lyman::Store.new(":memory:")
+    convo = Lyman::Conversation.new.with_user_message("a" * 100)
+    store.append(convo)
+    tool = Lyman::Tools.recall(store: store, max_chars: 50)
+
+    result = tool[:handler].call({"address" => "conv:#{convo.id}#1"})
+
+    assert_includes result, "this single element is longer than the cap"
+    refute_includes result, "narrow the range"
+  ensure
+    store.close
+  end
+
+  def test_blank_conversation_id_is_ignored_rather_than_scoping_to_nothing
+    store = Lyman::Store.new(":memory:")
+    convo = Lyman::Conversation.new.with_user_message("the treasure is under the oak")
+    store.append(convo)
+    tool = Lyman::Tools.recall(store: store)
+
+    result = tool[:handler].call({"query" => "treasure", "conversation_id" => " "})
+
+    assert_includes result, "conv:#{convo.id}#1 user"
+  end
+
+  def test_limit_is_clamped_to_a_sane_range
+    limits = []
+    fake_store = Object.new
+    fake_store.define_singleton_method(:search) do |_query, conversation_id:, limit:|
+      limits << limit
+      []
+    end
+    tool = Lyman::Tools.recall(store: fake_store)
+
+    tool[:handler].call({"query" => "x", "limit" => "-5"})
+    tool[:handler].call({"query" => "x", "limit" => 100_000})
+    tool[:handler].call({"query" => "x", "limit" => "nonsense"})
+
+    assert_equal [1, 50, 10], limits
   end
 
   def test_works_end_to_end_through_tool_execution
