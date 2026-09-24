@@ -75,9 +75,11 @@ my-agent/
 │   ├── lyman.rb           # entry point; requires shifty + planted modules
 │   └── lyman/
 │       ├── conversation.rb            # the item that flows through pipelines
-│       └── workers/
-│           ├── chat_completion.rb     # model transport (the only file that knows HTTP exists)
-│           └── tool_execution.rb      # executes pending tool calls
+│       ├── workers/
+│       │   ├── chat_completion.rb     # model transport (the only file that knows HTTP exists)
+│       │   └── tool_execution.rb      # executes pending tool calls
+│       └── tools/
+│           └── current_time.rb        # one tool, schema + handler side by side
 └── .lyman/manifest.yml    # what was planted, at which version — commit it
 ```
 
@@ -92,21 +94,47 @@ Two kinds of files, one important boundary:
 
 ## Give it a real tool
 
-Open `harness/repl.rb` and find the `TOOLS` hash — schema and handler side
-by side, guts on the outside:
+Tools live one file per tool under `lib/lyman/tools/`, each a factory
+returning `{schema:, handler:}` — schema and handler side by side, guts on
+the outside. The one you already have:
 
 ```ruby
-TOOLS = {
-  "current_time" => {
-    schema: { ... },                # what the model sees
-    handler: ->(_args) { Time.now.strftime("%Y-%m-%d %H:%M:%S %Z") }
-  }
-}
+# lib/lyman/tools/current_time.rb
+module Lyman
+  module Tools
+    def self.current_time
+      {
+        schema: {
+          "type" => "function",
+          "function" => {
+            "name" => "current_time",
+            "description" => "Returns the current local date and time",
+            "parameters" => {"type" => "object", "properties" => {}, "required" => []}
+          }
+        },
+        handler: ->(_args) { Time.now.strftime("%Y-%m-%d %H:%M:%S %Z") }
+      }
+    end
+  end
+end
 ```
 
-Add an entry — a weather lookup, a database query, a shell command — restart
-the repl, and ask for it. That's the whole tool-registration story: no
-registries, no decorators, one hash in a file you own.
+Open `harness/repl.rb` and find the `TOOLS` array, where every tool the
+model can call is listed by name:
+
+```ruby
+TOOLS = [
+  Lyman::Tools.current_time
+]
+```
+
+Write your own the same way — a weather lookup, a database query, a
+shell command — in your own directory rather than `lib/lyman/` (that tree
+is managed by lyman): say `lib/tools/weather.rb` defining `Tools.weather`.
+`require_relative "../lib/tools/weather"` it from the harness, add
+`Tools.weather` to `TOOLS`, restart the repl, and ask for it. That's the
+whole tool-registration story: no runtime registries, no decorators, one
+file plus one line in an array you own.
 
 ## Where to next
 

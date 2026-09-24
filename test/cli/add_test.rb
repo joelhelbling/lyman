@@ -170,6 +170,48 @@ class AddTest < Minitest::Test
     end
   end
 
+  def test_add_current_time_tool_advises_wiring_when_no_harness_mentions_it
+    in_tmpdir do
+      scaffold_project("demo")
+      Dir.chdir("demo") do
+        manifest = Lyman::CLI::Manifest.load(Dir.pwd)
+        manifest.delete_artifact("current_time_tool")
+        manifest.save
+        FileUtils.rm_f("lib/lyman/tools/current_time.rb")
+        # The repl no longer mentions the tool, so `add` should notice it's
+        # unwired rather than assume the harness already hands it to the model.
+        contents = File.read("harness/repl.rb").gsub("Lyman::Tools.current_time", "# removed for this test")
+        File.write("harness/repl.rb", contents)
+
+        result = run_cli("add", "current_time_tool")
+
+        assert_equal 0, result.status
+        assert File.exist?("lib/lyman/tools/current_time.rb")
+        assert_includes result.out, "not wired"
+        assert_includes result.out, "Lyman::Tools.current_time"
+      end
+    end
+  end
+
+  def test_add_current_time_tool_gives_no_wiring_advice_when_a_harness_mentions_it
+    in_tmpdir do
+      scaffold_project("demo")
+      Dir.chdir("demo") do
+        manifest = Lyman::CLI::Manifest.load(Dir.pwd)
+        manifest.delete_artifact("current_time_tool")
+        manifest.save
+        FileUtils.rm_f("lib/lyman/tools/current_time.rb")
+        # harness/repl.rb (planted by `new`) already lists Lyman::Tools.current_time.
+        assert_includes File.read("harness/repl.rb"), "Lyman::Tools.current_time"
+
+        result = run_cli("add", "current_time_tool")
+
+        assert_equal 0, result.status
+        refute_includes result.out, "not wired"
+      end
+    end
+  end
+
   def test_readd_over_tombstone_prompts_and_force_restores_managed_status
     in_tmpdir do
       scaffold_project("demo")

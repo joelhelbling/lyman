@@ -36,23 +36,14 @@ $stdout.sync = true
 BASE_URL = ENV.fetch("LYMAN_BASE_URL", "http://localhost:11434/v1")
 MODEL = ENV.fetch("LYMAN_MODEL", "gemma4:latest")
 
-# ── Tools: schema and handler side by side, guts on the outside ────────────
-TOOLS = {
-  "current_time" => {
-    schema: {
-      "type" => "function",
-      "function" => {
-        "name" => "current_time",
-        "description" => "Returns the current local date and time",
-        "parameters" => {"type" => "object", "properties" => {}, "required" => []}
-      }
-    },
-    handler: ->(_args) { Time.now.strftime("%Y-%m-%d %H:%M:%S %Z") }
-  }
-}
+# ── Tools: one file each in lib/lyman/tools/, schema and handler side by side ─
+# `lyman add <name>_tool` plants more; list them here to hand them to the model.
+TOOLS = [
+  Lyman::Tools.current_time
+]
 
-schemas = TOOLS.values.map { |tool| tool[:schema] }
-handlers = TOOLS.transform_values { |tool| tool[:handler] }
+schemas = TOOLS.map { |tool| tool[:schema] }
+handlers = TOOLS.to_h { |tool| [tool[:schema].dig("function", "name"), tool[:handler]] }
 
 # ── Shell state ─────────────────────────────────────────────────────────────
 conversation = Lyman::Conversation.new(
@@ -94,7 +85,7 @@ puts gray(<<~HINTS.gsub(/^/, "  "))
   exit:                 blank line, ctrl-c, or ctrl-d
   change the model:     LYMAN_MODEL=qwen3.5:2b #{$PROGRAM_NAME}
   change the endpoint:  LYMAN_BASE_URL=http://localhost:1234/v1 #{$PROGRAM_NAME}
-  available tools:      #{TOOLS.keys.join(", ")} — a ⚙ line appears when the model calls one
+  available tools:      #{handlers.keys.join(", ")} — a ⚙ line appears when the model calls one
 HINTS
 
 loop do

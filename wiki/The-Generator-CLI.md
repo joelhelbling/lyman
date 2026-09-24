@@ -81,6 +81,7 @@ module the harness merely wires together.
 | `chat_completion` | the model transport; the only file that knows HTTP exists — managed |
 | `tool_execution` | executes pending tool calls — managed |
 | `abridgement` | `Lyman::Abridgement` — deterministic, model-free wire-time context reduction — managed, planted by `new` |
+| `current_time_tool` | `Lyman::Tools.current_time` — the demo tool the harnesses start with, one file under `lib/lyman/tools/` — managed, planted by `new` |
 | `store` | `Lyman::Store` — SQLite conversation persistence with lineage and full-text search; the only file that knows `sqlite3` exists — managed, opt-in: `lyman add store` |
 | `store_append` | the `side_worker` that splices a `store` into a circuit — managed, opt-in: `lyman add store_append` |
 | `claude_md` | guidance for coding agents working in your project — owned |
@@ -88,7 +89,11 @@ module the harness merely wires together.
 
 `lyman add store` plants `Lyman::Store` and prints a reminder to add
 `gem "sqlite3"` to your `Gemfile` if it isn't already there — the
-`Gemfile` is owned by you, so lyman advises rather than edits it.
+`Gemfile` is owned by you, so lyman advises rather than edits it. Tools
+follow the same advise-don't-edit rule for wiring: `lyman add <name>_tool`
+plants the tool file and, if no harness already mentions it, reminds you
+to add its factory call to your harness's `TOOLS` array — harnesses are
+owned, so lyman won't edit them for you.
 
 ## `lyman doctor`
 

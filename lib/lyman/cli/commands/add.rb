@@ -45,6 +45,7 @@ module Lyman
           manifest.save
           @thor.say "Planted #{name} (#{spec[:role]}) at #{spec[:dest]}."
           advise_on_gems(name, spec, project_root)
+          advise_on_wiring(name, spec, project_root)
         end
 
         private
@@ -64,6 +65,23 @@ module Lyman
           gemfile = File.join(project_root, "Gemfile")
           return false unless File.exist?(gemfile)
           /gem\s+["']#{Regexp.escape(gem_name)}["']/.match?(File.read(gemfile)) || false
+        end
+
+        # Harnesses are owned files, so lyman advises rather than edits them —
+        # a planted tool the model never hears about (because no TOOLS list
+        # mentions it) would otherwise fail silently rather than loudly.
+        def advise_on_wiring(name, spec, project_root)
+          wire = spec[:wire]
+          return unless wire
+          return if any_harness_mentions?(project_root, wire)
+          @thor.say "#{name} is planted but not wired: add #{wire} to TOOLS in your harness " \
+            "to hand it to the model (harnesses are yours, so lyman doesn't edit them)."
+        end
+
+        def any_harness_mentions?(project_root, wire)
+          Dir.glob(File.join(project_root, "harness", "**", "*.rb")).any? do |path|
+            File.read(path).include?(wire)
+          end
         end
 
         def plant(manifest, name, spec, project_root)

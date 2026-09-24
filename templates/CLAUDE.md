@@ -32,6 +32,29 @@ shapes — see the [Harness Archetypes wiki page](https://github.com/joelhelblin
 To build a new harness, start from the archetype whose shell shape matches
 — the circuit rarely needs to change; the supplier of work items does.
 
+## Adding a tool
+
+A tool is one file holding a factory that returns `{schema:, handler:}`
+— the schema the model sees and the callable that answers it, side by side,
+string keys throughout. Dependencies (a store, a client) are the factory's
+keyword arguments. Shipped tools live under `lib/lyman/tools/` as
+`Lyman::Tools.<name>` and are planted with `lyman add <name>_tool`. Your
+own tools follow the same shape in your own namespace and directory (say
+`lib/tools/weather.rb` defining `Tools.weather`), not inside `lib/lyman/`
+— see the managed/owned boundary below — and your harness
+`require_relative`s them.
+
+Either way, the harness has to list the tool to hand it to the model — no
+auto-registration, because what the model can call has to stay visible in
+the wiring script. `lyman add` reminds you if a planted tool isn't listed:
+
+```ruby
+TOOLS = [
+  Lyman::Tools.current_time,
+  Tools.weather
+]
+```
+
 ## The managed/owned boundary
 
 Everything under the `Lyman::` namespace (`lib/lyman.rb`, `lib/lyman/`) is
