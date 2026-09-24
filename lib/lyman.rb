@@ -10,6 +10,8 @@ require_relative "lyman/store"
 require_relative "lyman/workers/store_append"
 require_relative "lyman/tools/current_time"
 require_relative "lyman/tools/recall"
+require_relative "lyman/tools/search_files"
+require_relative "lyman/tools/read_file"
 
 module Lyman
 end

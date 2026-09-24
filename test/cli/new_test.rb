@@ -39,6 +39,31 @@ class NewTest < Minitest::Test
     end
   end
 
+  # search_files and read_file are file primitives (docs/design/tools-and-
+  # agents.md), stdlib-only and planted by default — same self-containment
+  # guarantee as current_time.rb.
+  def test_planted_search_files_tool_is_self_contained
+    in_tmpdir do
+      project = scaffold_project
+      script = 'require "./lib/lyman/tools/search_files"; ' \
+        'print Lyman::Tools.search_files[:schema].dig("function", "name")'
+      out = IO.popen([RbConfig.ruby, "-e", script], chdir: project, &:read)
+
+      assert_equal "search_files", out
+    end
+  end
+
+  def test_planted_read_file_tool_is_self_contained
+    in_tmpdir do
+      project = scaffold_project
+      script = 'require "./lib/lyman/tools/read_file"; ' \
+        'print Lyman::Tools.read_file[:schema].dig("function", "name")'
+      out = IO.popen([RbConfig.ruby, "-e", script], chdir: project, &:read)
+
+      assert_equal "read_file", out
+    end
+  end
+
   # recall_tool is optional (it needs a store), so it isn't planted by
   # `new` — plant it with `add` to prove it's self-contained too: no
   # requires of sibling lyman files, so it can be planted/updated/ejected
@@ -60,8 +85,12 @@ class NewTest < Minitest::Test
   # Lyman::Tools.<x> this repo's own harnesses list must have a matching
   # registry artifact (by `wire:`) that isn't optional.
   def test_every_harness_tool_reference_has_a_default_registry_artifact
-    tools_wired = Lyman::CLI::Registry::ARTIFACTS.values.filter_map { |spec| spec[:wire] }
-    default_wired = Lyman::CLI::Registry.default.values.filter_map { |spec| spec[:wire] }
+    # Compared as barewords (dropping any "(...)" args), the same way
+    # add.rb's any_harness_mentions? matches a wire: against a harness —
+    # a harness may pass its own variables where wire: shows the default
+    # keyword arguments (e.g. root: Dir.pwd).
+    tools_wired = Lyman::CLI::Registry::ARTIFACTS.values.filter_map { |spec| spec[:wire]&.sub(/\(.*\z/m, "") }
+    default_wired = Lyman::CLI::Registry.default.values.filter_map { |spec| spec[:wire]&.sub(/\(.*\z/m, "") }
 
     Dir.glob(File.join(Lyman::CLI::Registry::GEM_ROOT, "harness", "*.rb")).each do |path|
       referenced = File.read(path).scan(/Lyman::Tools\.\w+/).uniq

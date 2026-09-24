@@ -39,7 +39,10 @@ MODEL = ENV.fetch("LYMAN_MODEL", "gemma4:latest")
 # ── Tools: one file each in lib/lyman/tools/, schema and handler side by side ─
 # `lyman add <name>_tool` plants more; list them here to hand them to the model.
 TOOLS = [
-  Lyman::Tools.current_time
+  Lyman::Tools.current_time,
+  # Read-only, confined to this project's working directory.
+  Lyman::Tools.search_files(root: Dir.pwd),
+  Lyman::Tools.read_file(root: Dir.pwd)
 ]
 
 schemas = TOOLS.map { |tool| tool[:schema] }
