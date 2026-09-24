@@ -84,13 +84,19 @@ def run_compactor(inbox, base_url:, model:, instructions: COMPACTOR_INSTRUCTIONS
 
     arrivals.slice_when { |a, b| [a, b].any?(Lyman::Compaction::Request) }.each do |run|
       if run.first.is_a?(Lyman::Compaction::Request)
+        # Always answer: the root shell is blocked waiting on this reply,
+        # so a failed compaction hands back the conversation as it was.
         request = run.first
-        compacted = ledger.compact(request.conversation)
-        ledger = ledger.cover(compacted)
+        compacted = begin
+          ledger.compact(request.conversation).tap { |child| ledger = ledger.cover(child) }
+        rescue => e
+          warn "compactor: compaction failed (#{e.class}: #{e.message}); handing back the conversation uncompacted"
+          request.conversation
+        end
         request.reply << compacted
       else
-        prompt = ledger.prompt(run, instructions: instructions)
         reply = begin
+          prompt = ledger.prompt(run, instructions: instructions)
           prompt && digest.call(prompt).last_assistant_content
         rescue => e
           warn "compactor: digest failed (#{e.class}: #{e.message}); recording a gap"
@@ -100,4 +106,10 @@ def run_compactor(inbox, base_url:, model:, instructions: COMPACTOR_INSTRUCTIONS
       end
     end
   end
+rescue => e
+  # Anything that escapes the loop has killed the sidecar. Say so loudly:
+  # otherwise every later compaction request just waits out its timeout,
+  # which looks like a slow app rather than a dead compactor.
+  warn "compactor: sidecar stopped (#{e.class}: #{e.message}); compaction requests will time out"
+  raise
 end

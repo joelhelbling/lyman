@@ -202,7 +202,11 @@ class CompactionTest < Minitest::Test
     compactor&.join
   end
 
-  def test_request_falls_back_to_the_original_when_the_sidecar_never_answers
-    assert_same conversation, Lyman::Compaction.request(Thread::Queue.new, conversation, timeout: 0.05)
+  def test_request_falls_back_to_the_original_and_says_so_when_the_sidecar_never_answers
+    result = nil
+    _out, err = capture_io { result = Lyman::Compaction.request(Thread::Queue.new, conversation, timeout: 0.05) }
+
+    assert_same conversation, result
+    assert_includes err, "no answer from the sidecar"
   end
 end

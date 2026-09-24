@@ -89,6 +89,20 @@ class CompactorTest < Minitest::Test
     end
   end
 
+  def test_a_compaction_that_raises_still_answers_and_the_sidecar_keeps_running
+    with_sidecar("[]") do |inbox, _bodies|
+      not_a_conversation = Object.new # compact() raises on it
+      conversation = root_turn(Lyman::Conversation.new(system_prompt: "sys"), "hello", "hi")
+
+      answered = nil
+      _out, err = capture_io { answered = Lyman::Compaction.request(inbox, not_a_conversation, timeout: 5) }
+
+      assert_same not_a_conversation, answered
+      assert_includes err, "compaction failed"
+      assert_equal conversation.id, Lyman::Compaction.request(inbox, conversation, timeout: 5).parent_id
+    end
+  end
+
   def test_a_failing_digest_model_leaves_a_gap_not_a_dead_sidecar
     with_sidecar(nil) do |inbox, _bodies|
       conversation = root_turn(Lyman::Conversation.new(system_prompt: "sys"), "hello", "hi")

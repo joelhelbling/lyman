@@ -244,8 +244,12 @@ behind it is), and splits the arrivals at each request: elements before a
 request are digested first, then `ledger.compact(conversation)` builds the
 compacted conversation and it goes back on the request's reply queue.
 `Compaction.request` waits on that queue with a timeout (default 120s)
-and falls back to the conversation as given, so a dead or wedged sidecar
-costs a missed compaction, never a hung root shell. The digest circuit is
+and falls back to the conversation as given, with a warning, so a dead or
+wedged sidecar costs a missed compaction, never a hung root shell. The
+sidecar always answers a request (a compaction that raises hands back the
+conversation uncompacted), and if its loop dies anyway it warns before
+the thread ends, so a broken compactor is loud rather than a mystery
+stall. The digest circuit is
 rebuilt per batch because an error raised inside a shifty pipeline ends
 it, and the sidecar must outlive a flaky model call.
 
@@ -259,7 +263,7 @@ message rather than two, because many local chat templates reject a
 second. Compacting a compaction replaces the ledger below that heading
 rather than stacking a second copy (the new ledger already carries every
 older entry). Then the verbatim tail: the last turn, from its user
-message on, reasoning dropped. The sidecar then `cover`s the conversation
+message on, reasoning dropped. The sidecar then covers (`Ledger#cover`) the conversation
 it handed back, so its opening — ledger plus tail, already accounted
 for — isn't fed back through the digest model as news when the root
 circuit starts feeding it.
