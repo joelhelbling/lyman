@@ -46,6 +46,7 @@ module Lyman
           @thor.say "Planted #{name} (#{spec[:role]}) at #{spec[:dest]}."
           advise_on_gems(name, spec, project_root)
           advise_on_wiring(name, spec, project_root)
+          advise_on_needs(name, spec, manifest)
         end
 
         private
@@ -86,6 +87,20 @@ module Lyman
           call = /#{Regexp.escape(wire.sub(/\(.*\z/m, ""))}\b/
           Dir.glob(File.join(project_root, "harness", "**", "*.rb")).any? do |path|
             call.match?(File.read(path))
+          end
+        end
+
+        # A `needs:` dependency (e.g. recall_tool needing a store) is
+        # duck-typed, so lyman can't just plant it for you — you might be
+        # wiring in your own object. It only advises, the same
+        # don't-edit-what-you-don't-own posture as the Gemfile and wiring
+        # advice above.
+        def advise_on_needs(name, spec, manifest)
+          (spec[:needs] || []).each do |needed|
+            status = manifest.artifact(needed)&.fetch("status", nil)
+            next if %w[managed owned].include?(status)
+            @thor.say "#{name} expects #{needed}: run `lyman add #{needed}` " \
+              "(or wire in your own object with the same interface)."
           end
         end
 

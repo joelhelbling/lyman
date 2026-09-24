@@ -121,6 +121,11 @@ pipeline. Point it elsewhere with `LYMAN_BASE_URL` and `LYMAN_MODEL`.
   welcome) picked when wiring the chat completion worker, and
   `Abridgement.over_budget` can gate one on the transport's own `usage`
   report, stamped onto the conversation after each reply.
+- **Over-compaction is recoverable, not fatal.** `Lyman::Tools.recall(store:)`
+  lets the model re-expand what a stub or a ledger entry points at — by
+  address (`conv:abc#17-23`) or by plain-word search — bounded so a wide
+  recall can't blow the very context it's meant to relieve. Opt-in with
+  `lyman add recall_tool` once a store is planted.
 
 The longer story — mission, principles, architecture decisions, open
 questions — is in [docs/vision.md](docs/vision.md).

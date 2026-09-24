@@ -136,6 +136,11 @@ is managed by lyman): say `lib/tools/weather.rb` defining `Tools.weather`.
 whole tool-registration story: no runtime registries, no decorators, one
 file plus one line in an array you own.
 
+Lyman also ships one ready-made tool with a dependency: `lyman add store`
+then `lyman add recall_tool` gets you `Lyman::Tools.recall(store: store)`,
+which lets the model re-expand context an abridgement policy or
+compaction stubbed away — see [The Generator CLI](The-Generator-CLI).
+
 ## Where to next
 
 - **Your agent isn't a chat?** Most aren't. Read

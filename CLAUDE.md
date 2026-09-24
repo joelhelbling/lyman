@@ -37,6 +37,8 @@ source of truth for intent; this file is a summary plus working conventions.
   to the client Gemfile if it isn't already there — the Gemfile is owned by
   the user, so lyman advises rather than edits it. The `sqlite3` gem is
   already in this repo's own `Gemfile`, for the store's tests and harness use.
+  `lyman add recall_tool` plants the recall tool and advises `lyman add store`
+  too if a store isn't already planted.
 
 ## Layout
 
@@ -52,7 +54,8 @@ source of truth for intent; this file is a summary plus working conventions.
   (`lib/lyman/tools/` — one file per tool, each a factory
   `Lyman::Tools.<name>(**deps)` returning `{schema:, handler:}`, mirroring
   the `Workers` factories; `current_time` is the managed demo tool `lyman
-  new` plants). These files are
+  new` plants, `recall` (`store:`) re-expands abridged or compacted
+  context and is managed but optional, since it needs a store). These files are
   both what this repo runs and what the generator plants into client
   projects — one copy, kept alive by use. `Store` and `store_append` are
   managed but optional: `lyman new` doesn't plant them, `lyman add store` /

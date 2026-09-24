@@ -37,7 +37,9 @@ To build a new harness, start from the archetype whose shell shape matches
 A tool is one file holding a factory that returns `{schema:, handler:}`
 — the schema the model sees and the callable that answers it, side by side,
 string keys throughout. Dependencies (a store, a client) are the factory's
-keyword arguments. Shipped tools live under `lib/lyman/tools/` as
+keyword arguments — `Lyman::Tools.recall(store: store)` is the shipped
+example, planted with `lyman add recall_tool` once `lyman add store` has
+planted its dependency. Shipped tools live under `lib/lyman/tools/` as
 `Lyman::Tools.<name>` and are planted with `lyman add <name>_tool`. Your
 own tools follow the same shape in your own namespace and directory (say
 `lib/tools/weather.rb` defining `Tools.weather`), not inside `lib/lyman/`

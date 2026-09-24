@@ -1,7 +1,8 @@
 # Design note: fine-grained control of context
 
-**Status:** accepted direction; part 1 (elements, issue #8), part 2 (store,
-issue #9), and part 3 (abridgement, issue #10) are implemented
+**Status:** accepted direction; parts 1 (elements, issue #8), 2 (store,
+issue #9), 3 (abridgement, issue #10), and 5 (recall tool, issue #12) are
+implemented. Part 4 (compaction sidecar, issue #11) is not done yet.
 **Tracked by:** the "context control" GitHub issues (elements, store,
 abridgement, compaction sidecar, recall tool)
 
@@ -111,7 +112,7 @@ Two policies ship, plus two combinators:
   one-line stand-in — `{"tool_call_id" => ..., "text" => stub}` — naming
   the tool, the original size, and the original element's `address` (e.g.
   `"[abridged: current_time result, 1234 chars — conv:abc#12]"`). That
-  address is exactly what the recall tool (issue #12) will need to
+  address is exactly what the recall tool (issue #12) uses to
   re-expand it, so abridging a tool result is a wire-time compression, not
   a decision to forget it. A stub is only used when it's actually shorter
   than the original text; a `nil` result is left as is. `keep_rounds` must be at least 1 —
@@ -270,12 +271,48 @@ therefore an opt-in splice, not a built-in assumption: the shipped
 harnesses stay stdlib-only, and a developer who wants a store adds it to
 their own wiring script with `lyman add store` / `lyman add store_append`.
 
-A **recall tool** (issue #12) lets the model re-expand what a ledger
-entry points at: query by conversation id, element range, or text,
-walking the ancestor chain the store already exposes via `lineage`.
-Over-compaction is thereby redressable rather than fatal. This tool is
-the bridge to the tools direction described in
-[tools-and-agents.md](tools-and-agents.md).
+**The recall tool** (`Lyman::Tools.recall`, `lib/lyman/tools/recall.rb`,
+issue #12) lets the model re-expand what a stub or a ledger entry points
+at. It follows the plantable tools convention (docs/design/tools-and-agents.md):
+a factory taking its dependency as a keyword argument —
+`Lyman::Tools.recall(store:, max_chars: 8000)` — self-contained and
+stdlib-only itself, since `store` is duck-typed (anything answering
+`fetch(address)` and `search(query, conversation_id:, limit:)`) rather
+than required to be `Lyman::Store`. The model can pass an `address`
+(`"conv:abc"`, `"conv:abc#17"`, `"conv:abc#17-23"`) to re-expand exactly
+what a stub or ledger entry names, or a plain-word `query` (optionally
+scoped to a `conversation_id`, which walks that conversation's ancestor
+chain via the store's `lineage` the same way `search` does) when it
+doesn't have an address to hand. Output is rendered as one block per
+element — its address, type, and text — and capped at `max_chars`
+(default 8000): a recall of a whole conversation must not blow the very
+context the abridgement was protecting, so an over-wide result is
+truncated with a note telling the model to ask again with a narrower
+range. Over-compaction is thereby redressable rather than fatal.
+
+Registered as `recall_tool` (`optional: true`, since a fresh scaffold has
+no store yet, and `needs: ["store"]`, so `lyman add recall_tool` advises
+`lyman add store` if it isn't planted). Wiring a harness with a store
+looks like:
+
+```ruby
+store = Lyman::Store.new("conversations.db")
+
+TOOLS = [
+  Lyman::Tools.current_time,
+  Lyman::Tools.recall(store: store)
+]
+
+# ...spliced into the circuit so the store actually gets what recall reads back:
+pipeline =
+  source_worker { rounds.shift } |
+  Lyman::Workers.chat_completion(base_url: BASE_URL, model: MODEL, tools: schemas) |
+  relay_worker { |c| (c.pending_tool_calls.empty? || c.runaway?) ? c.finish : c } |
+  Lyman::Workers.tool_execution(handlers) |
+  Lyman::Workers.store_append(store) |
+  side_worker { |c| rounds << c unless c.finished? } |
+  filter_worker { |c| c.finished? }
+```
 
 ## Developer experience: what changes, and what it costs
 
@@ -331,4 +368,4 @@ What it costs, stated plainly:
 3. Wire-time abridgement policies, plus usage stamping so a policy can
    gate on context pressure. **Done** (issue #10).
 4. Compaction sidecar.
-5. Recall tool.
+5. Recall tool. **Done** (issue #12).

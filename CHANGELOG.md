@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- **The recall tool** (`lyman add recall_tool`): `Lyman::Tools.recall(store:,
+  max_chars: 8000)` lets the model re-expand context an abridgement policy
+  or a compaction ledger entry compressed away, by element address
+  (`conv:abc#17-23`) or plain-word search — the first tool with a
+  dependency, registered with `needs: ["store"]` so `add` advises `lyman
+  add store` when it isn't planted yet. Output is bounded by `max_chars`
+  so a wide recall can't blow the very context it's meant to relieve.
+  Closes part 5 of the context-control design (issue #12).
+
 ## 0.3.0
 
 The harness archetypes and immutable conversation release. Lyman now ships
