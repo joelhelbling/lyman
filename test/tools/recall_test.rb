@@ -242,6 +242,47 @@ class RecallTest < Minitest::Test
     assert_includes result, "conv:#{convo.id}#1 user"
   end
 
+  # Seen live: a model scoped its query with the address from a stub
+  # ("conv:ID#6") rather than the bare id.
+  def test_conversation_id_given_as_an_address_scopes_to_that_conversation
+    store = Lyman::Store.new(":memory:")
+    convo = Lyman::Conversation.new.with_user_message("the treasure is under the oak")
+    store.append(convo)
+    tool = Lyman::Tools.recall(store: store)
+
+    result = tool[:handler].call({"query" => "treasure", "conversation_id" => "conv:#{convo.id}#1"})
+
+    assert_includes result, "conv:#{convo.id}#1 user"
+  ensure
+    store.close
+  end
+
+  def test_empty_query_result_explains_that_every_word_must_match
+    store = Lyman::Store.new(":memory:")
+    store.append(Lyman::Conversation.new.with_user_message("the treasure is under the oak"))
+    tool = Lyman::Tools.recall(store: store)
+
+    result = tool[:handler].call({"query" => "treasure misspeled"})
+
+    assert_includes result, "Every word must match"
+  ensure
+    store.close
+  end
+
+  def test_address_embedded_in_a_pasted_stub_is_extracted
+    store = Lyman::Store.new(":memory:")
+    convo = Lyman::Conversation.new.with_user_message("the treasure is under the oak")
+    store.append(convo)
+    tool = Lyman::Tools.recall(store: store)
+
+    stub = "[abridged: read_report result, 505 chars — conv:#{convo.id}#1]"
+    result = tool[:handler].call({"address" => stub})
+
+    assert_includes result, "the treasure is under the oak"
+  ensure
+    store.close
+  end
+
   def test_limit_is_clamped_to_a_sane_range
     limits = []
     fake_store = Object.new
