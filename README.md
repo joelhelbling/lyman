@@ -107,6 +107,14 @@ pipeline. Point it elsewhere with `LYMAN_BASE_URL` and `LYMAN_MODEL`.
 - **Dependencies stay inside the workers that need them.** The HTTP client
   lives in exactly one file. Use your favorite gems — in such a way that only
   the worker requiring one knows it exists.
+- **File primitives ship planted, not hand-rolled.** `Lyman::Tools.search_files(root:)`
+  (literal, case-insensitive content search, or a bare file-name/glob
+  lookup when no pattern is given) and `Lyman::Tools.read_file(root:)`
+  (line-numbered, optionally by range) are stdlib-only and planted by
+  `lyman new` alongside `current_time`. Both are confined to `root` — every
+  path is resolved with `File.realpath`, so `..` traversal and symlinks
+  pointing outside it are refused — and every failure comes back as a
+  message the model can read rather than an exception.
 - **Persistence is an opt-in splice, not a built-in.** `Lyman::Store` (SQLite,
   confined to its own file) gives a conversation a durable, addressable,
   full-text-searchable home; `Lyman::Workers.store_append` is the one
@@ -213,7 +221,8 @@ touched at all: it's yours from day one.
 Early and moving. What exists today: the vision, circuit-pattern,
 harness-archetypes, and deployment design docs, the core `Conversation` item
 (an append-only element series), chat-completion and tool-execution workers,
-an optional SQLite `Store` with lineage and full-text search, deterministic
+an optional SQLite `Store` with lineage and full-text search, the
+`search_files`/`read_file` file primitives, deterministic
 wire-time `Abridgement` policies plus transport usage stamping, the three
 archetype harnesses (repl, daemon, script) working against live local
 models, and the generator CLI (`new` / `add` / `update` / `eject` / `diff` /

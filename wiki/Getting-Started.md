@@ -79,7 +79,9 @@ my-agent/
 │       │   ├── chat_completion.rb     # model transport (the only file that knows HTTP exists)
 │       │   └── tool_execution.rb      # executes pending tool calls
 │       └── tools/
-│           └── current_time.rb        # one tool, schema + handler side by side
+│           ├── current_time.rb        # one tool, schema + handler side by side
+│           ├── search_files.rb        # search a tree by content or file name, confined to root:
+│           └── read_file.rb           # read a file, optionally by line range, confined to root:
 └── .lyman/manifest.yml    # what was planted, at which version — commit it
 ```
 
@@ -124,7 +126,9 @@ model can call is listed by name:
 
 ```ruby
 TOOLS = [
-  Lyman::Tools.current_time
+  Lyman::Tools.current_time,
+  Lyman::Tools.search_files(root: Dir.pwd),
+  Lyman::Tools.read_file(root: Dir.pwd)
 ]
 ```
 
