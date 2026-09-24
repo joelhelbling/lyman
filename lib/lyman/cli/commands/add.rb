@@ -74,13 +74,18 @@ module Lyman
           wire = spec[:wire]
           return unless wire
           return if any_harness_mentions?(project_root, wire)
-          @thor.say "#{name} is planted but not wired: add #{wire} to TOOLS in your harness " \
+          @thor.say "#{name} is planted but not wired: add #{wire} to a harness's TOOLS array " \
             "to hand it to the model (harnesses are yours, so lyman doesn't edit them)."
         end
 
+        # A heuristic, since the advice is only a reminder: match the factory
+        # call by name, ignoring its arguments (a harness may pass its own
+        # variable where `wire:` says `store: store`), and stop at a word
+        # boundary so current_time_range doesn't count as current_time.
         def any_harness_mentions?(project_root, wire)
+          call = /#{Regexp.escape(wire.sub(/\(.*\z/m, ""))}\b/
           Dir.glob(File.join(project_root, "harness", "**", "*.rb")).any? do |path|
-            File.read(path).include?(wire)
+            call.match?(File.read(path))
           end
         end
 

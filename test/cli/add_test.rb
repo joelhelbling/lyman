@@ -212,6 +212,26 @@ class AddTest < Minitest::Test
     end
   end
 
+  # A longer tool name sharing the prefix is a different tool, not a mention.
+  def test_add_current_time_tool_advises_wiring_when_a_harness_only_mentions_a_longer_name
+    in_tmpdir do
+      scaffold_project("demo")
+      Dir.chdir("demo") do
+        manifest = Lyman::CLI::Manifest.load(Dir.pwd)
+        manifest.delete_artifact("current_time_tool")
+        manifest.save
+        FileUtils.rm_f("lib/lyman/tools/current_time.rb")
+        contents = File.read("harness/repl.rb").gsub("Lyman::Tools.current_time", "Lyman::Tools.current_time_range")
+        File.write("harness/repl.rb", contents)
+
+        result = run_cli("add", "current_time_tool")
+
+        assert_equal 0, result.status
+        assert_includes result.out, "not wired"
+      end
+    end
+  end
+
   def test_readd_over_tombstone_prompts_and_force_restores_managed_status
     in_tmpdir do
       scaffold_project("demo")
