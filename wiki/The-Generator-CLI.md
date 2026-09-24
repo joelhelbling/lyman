@@ -80,6 +80,7 @@ module the harness merely wires together.
 | `conversation` | the item that flows through pipelines — managed |
 | `chat_completion` | the model transport; the only file that knows HTTP exists — managed |
 | `tool_execution` | executes pending tool calls — managed |
+| `abridgement` | `Lyman::Abridgement` — deterministic, model-free wire-time context reduction — managed, planted by `new` |
 | `store` | `Lyman::Store` — SQLite conversation persistence with lineage and full-text search; the only file that knows `sqlite3` exists — managed, opt-in: `lyman add store` |
 | `store_append` | the `side_worker` that splices a `store` into a circuit — managed, opt-in: `lyman add store_append` |
 | `claude_md` | guidance for coding agents working in your project — owned |

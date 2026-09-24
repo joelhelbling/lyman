@@ -1,7 +1,7 @@
 # Design note: fine-grained control of context
 
-**Status:** accepted direction; part 1 (elements, issue #8) and part 2
-(store, issue #9) are implemented
+**Status:** accepted direction; part 1 (elements, issue #8), part 2 (store,
+issue #9), and part 3 (abridgement, issue #10) are implemented
 **Tracked by:** the "context control" GitHub issues (elements, store,
 abridgement, compaction sidecar, recall tool)
 
@@ -83,6 +83,93 @@ backlinks). Iterative compaction is just a longer ancestor chain.
 A compacted conversation should by default keep a short verbatim tail —
 the most recent turn — after the ledger, since the model usually needs the
 immediate exchange intact.
+
+### Abridgement policies
+
+`Lyman::Abridgement` (`lib/lyman/abridgement.rb`, stdlib only) is the first
+half made concrete. The protocol is deliberately thin: a policy is any
+object responding to `call(conversation) -> conversation`, plain lambdas
+included. Calling it returns a *view* — the same conversation with
+`elements` substituted (`conversation.with(elements: ...)`), never the
+conversation mutated and never a new one stored. `Lyman::Workers.chat_completion`
+builds the view, projects it to wire messages, and discards it; the reply
+it appends goes onto the **original** conversation, so an abridged-away
+element is still there — a stand-in only ever hides it from this one wire
+call. Stand-ins keep their `conversation_id`, `seq`, and `type`, so an
+address taken before or after abridgement still means the same thing.
+
+Two policies ship, plus two combinators:
+
+- `Lyman::Abridgement::SuppressPriorReasoning.new` drops `reasoning`
+  elements belonging to turns before the current one (the current turn is
+  everything after the last `user` element; with no `user` element yet,
+  nothing is dropped). Reasoning is usually only useful to the model that
+  produced it, in the turn it produced it — carrying yesterday's scratch
+  thoughts forward mostly just spends tokens.
+- `Lyman::Abridgement::StubToolResults.new(keep_rounds: 2)` replaces
+  `tool_result` elements older than `keep_rounds` model replies with a
+  one-line stand-in — `{"tool_call_id" => ..., "text" => stub}` — naming
+  the tool, the original size, and the original element's `address` (e.g.
+  `"[abridged: current_time result, 1234 chars — conv:abc#12]"`). That
+  address is exactly what the recall tool (issue #12) will need to
+  re-expand it, so abridging a tool result is a wire-time compression, not
+  a decision to forget it. A stub is only used when it's actually shorter
+  than the original text; a `nil` result is left as is.
+- `Lyman::Abridgement.chain(*policies)` returns a lambda that applies
+  policies left to right, so composing reductions is just listing them.
+- `Lyman::Abridgement.over_budget(max_prompt_tokens, policy)` returns a
+  lambda that applies `policy` only when the conversation's `prompt_tokens`
+  (see below) is known and over the threshold — otherwise the conversation
+  passes through unchanged. This is the item telling a stage *whether* to
+  act, never *which* policy to run; the gating stays a plain conditional
+  a harness can read at a glance, not a mode hidden inside a worker.
+
+None of this needs a model, which is why it's the first thing to reach for:
+it's synchronous, free, and reversible by construction (the series it
+projects from is never touched).
+
+#### Usage stamping
+
+A policy that reacts to context pressure needs to know the pressure exists.
+The transport already gets told: OpenAI-compatible chat completions
+responses report `usage` (`prompt_tokens`, `completion_tokens`,
+`total_tokens`). `Conversation` now carries that raw hash as `usage`
+(string keys, nil until a reply has landed), with `with_usage` to set it
+and `prompt_tokens` as the one field `over_budget` needs. It's control
+data, not series — the store doesn't persist it, and `with_user_message`
+deliberately leaves it alone, because the last report is still the best
+estimate of context size going into the *next* turn. The one thing to keep
+in mind: usage always lags one request — it describes the prompt that was
+*just* sent, not the one about to be. `over_budget` is still a useful gate
+on that basis; it just can't be exact about the turn in flight. And since
+the report describes the request as sent — already abridged, if the gate
+fired — a policy that pulls the prompt back under budget turns itself off
+again the next round. Set the threshold with headroom below the real limit.
+Streaming responses omit usage unless asked, so a streaming
+`chat_completion` sends `stream_options: {include_usage: true}` and picks
+the report off the final chunk.
+
+#### Reasoning back on the wire
+
+`wire_messages` still strips reasoning by default — some providers (e.g.
+DeepSeek) reject it on input, so "off unless asked" stays the safe
+default. But interleaved-thinking local models (gpt-oss, qwen3) expect
+their own current-turn chain of thought back between tool calls, so
+`chat_completion(..., send_reasoning: true)` passes `reasoning: true` into
+`wire_messages`, riding each assistant message's `"reasoning"` key. Turn
+this on paired with `SuppressPriorReasoning` — otherwise every earlier
+turn's thoughts ride along too, defeating the point.
+
+A harness wires a policy in visibly, the same way it wires anything else:
+
+```ruby
+# ── Context policy: what each round shows the model ─────────────────────────
+# The conversation keeps every element; this only shapes the wire projection.
+# Swap, chain (Lyman::Abridgement.chain), or drop it — nil sends everything.
+abridgement = Lyman::Abridgement::StubToolResults.new(keep_rounds: 2)
+```
+
+and then `Lyman::Workers.chat_completion(..., abridgement: abridgement)`.
 
 ## The compactor is a sidecar shell
 
@@ -236,8 +323,10 @@ What it costs, stated plainly:
 ## Order of work
 
 1. Conversation as a series of identifiable elements, with the wire
-   projection. Foundation.
-2. SQLite conversation store with lineage and full-text index.
-3. Wire-time abridgement policies.
+   projection. Foundation. **Done** (issue #8).
+2. SQLite conversation store with lineage and full-text index. **Done**
+   (issue #9).
+3. Wire-time abridgement policies, plus usage stamping so a policy can
+   gate on context pressure. **Done** (issue #10).
 4. Compaction sidecar.
 5. Recall tool.

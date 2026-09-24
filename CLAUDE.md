@@ -44,12 +44,16 @@ source of truth for intent; this file is a summary plus working conventions.
   through pipelines), `Element` (the typed, addressable units stored in a
   conversation), `Store` (`store.rb` — the only file that requires the
   `sqlite3` gem; persists conversations with lineage and a full-text
-  index), and `Workers` (factories like `chat_completion`,
-  `tool_execution`, and `store_append`, the `side_worker` that splices a
-  `Store` into a circuit). These files are both what this repo runs and
-  what the generator plants into client projects — one copy, kept alive by
-  use. `Store` and `store_append` are managed but optional: `lyman new`
-  doesn't plant them, `lyman add store` / `lyman add store_append` do.
+  index), `Abridgement` (`abridgement.rb` — deterministic, model-free
+  wire-time projection policies: `SuppressPriorReasoning`,
+  `StubToolResults`, `chain`, `over_budget`), and `Workers` (factories like
+  `chat_completion`, `tool_execution`, and `store_append`, the
+  `side_worker` that splices a `Store` into a circuit). These files are
+  both what this repo runs and what the generator plants into client
+  projects — one copy, kept alive by use. `Store` and `store_append` are
+  managed but optional: `lyman new` doesn't plant them, `lyman add store` /
+  `lyman add store_append` do. `Abridgement` is managed but not optional —
+  stdlib only, so `lyman new` plants it unconditionally.
 - `lib/lyman/cli/` — generator machinery (Thor CLI, registry, manifest,
   planter). Never planted into client projects. The boundary between what
   lyman *does* (this directory) and what it *installs* is the registry,
@@ -115,8 +119,13 @@ Concrete consequences:
   `Conversation` (`runaway?` / `max_rounds`). Keep that guard intact when
   rewiring.
 - **Wire vs. conversation:** reasoning elements are kept on the `Conversation`
-  for observability but stripped by `Conversation#wire_messages` before
-  anything goes out over the wire. Preserve that separation.
+  for observability but stripped by `Conversation#wire_messages` by default —
+  it rides the wire only when a harness explicitly opts in with
+  `chat_completion(..., send_reasoning: true)`, for interleaved-thinking
+  models that expect their own current-turn chain of thought back. Preserve
+  that separation. Abridgement policies (`Lyman::Abridgement`) layer on top:
+  they shape the wire *view* `chat_completion` builds and discards, never
+  the element series itself.
 
 ## Working conventions
 

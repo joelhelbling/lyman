@@ -96,6 +96,37 @@ given a `conversation_id` follows `lineage` up through ancestor
 conversations too — the same chain a future compaction step will use to
 recover what a ledger entry summarized.
 
+### Abridgement: shaping the wire view, not the history
+
+`Lyman::Abridgement` gives a harness deterministic, model-free control over
+what a round actually shows the model, without ever touching the
+conversation's element series. A policy is any object with
+`call(conversation) -> conversation` (a plain lambda qualifies); it returns
+a *view* — the same elements, some dropped or replaced by same-address
+stand-ins — that `Workers.chat_completion` projects to wire messages and
+then discards. The reply still lands on the **original** conversation, so
+nothing a policy hides is ever lost.
+
+Two policies ship: `SuppressPriorReasoning` drops `reasoning` elements from
+turns before the current one, and `StubToolResults.new(keep_rounds: 2)`
+collapses `tool_result` elements older than `keep_rounds` model replies
+into a one-line stand-in that names the tool, the original size, and the
+original element's address — everything a future recall tool needs to
+re-expand it. `Abridgement.chain(*policies)` composes several in order;
+`Abridgement.over_budget(max_tokens, policy)` applies one only when the
+conversation's `prompt_tokens` — stamped from the transport's `usage`
+report after each reply — is over the threshold, which is the
+item-as-control discipline applied to context management itself. Wiring
+one in is visible, like everything else:
+
+```ruby
+abridgement = Lyman::Abridgement::StubToolResults.new(keep_rounds: 2)
+# ...
+Lyman::Workers.chat_completion(base_url:, model:, tools:, abridgement:)
+```
+
+`nil` (the default) sends everything, unabridged.
+
 ### Item-as-control, and its discipline
 
 The item both *is transformed by* workers and *directs their behavior* —
@@ -184,9 +215,14 @@ Five facts that are load-bearing in every harness. They're also in the
    harnesses where no human is watching.
 4. **Wire vs. conversation.** Reasoning elements stay on the conversation
    for observability but are stripped by `wire_messages` before any call to
-   the model. A side effect — `messages` includes reasoning for debugging,
-   while `wire_messages` never does. Preserve the separation if you touch
-   message handling.
+   the model, by default. A side effect — `messages` includes reasoning for
+   debugging, while `wire_messages` never does unless a harness opts in
+   with `chat_completion(..., send_reasoning: true)` (for
+   interleaved-thinking models that want their own current-turn chain of
+   thought back — pair it with `SuppressPriorReasoning` so only *this*
+   turn's reasoning rides along). Preserve the separation if you touch
+   message handling. Abridgement policies layer on top of this: they shape
+   the wire *view* a round sends, never the conversation's element series.
 5. **Dependency isolation.** Each gem is confined to the single worker (or
    display widget) that needs it. The HTTP client lives in exactly one
    file; cli-ui lives only in the repl's display layer. Use your favorite
