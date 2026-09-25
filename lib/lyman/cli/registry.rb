@@ -122,6 +122,25 @@ module Lyman
         # archetype you can talk to on day one; the other two are opt-in
         # (`lyman add daemon_harness` / `lyman add script_harness`) because a
         # narrow, purpose-built agent wants one shell shape, not three.
+        # Agent-as-tool (docs/design/tools-and-agents.md): a script-archetype
+        # shell run inside a tool handler rather than a fourth harness
+        # archetype — same posture as compactor below. Owned, not optional:
+        # its prompt, tools, and model *are* the reading strategy, and
+        # harness/repl.rb (which `new` plants) requires it, so a fresh
+        # scaffold needs it on day one. `needs:` names the file primitives
+        # its inner circuit calls directly (not duck-typed the way
+        # recall_tool's store is), but they're managed and non-optional
+        # too, so `advise_on_needs` never has anything to say here.
+        "file_reader_agent" => {
+          source: "harness/agents/file_reader.rb",
+          dest: "harness/agents/file_reader.rb",
+          role: :owned,
+          needs: ["search_files_tool", "read_file_tool"],
+          wire: "file_reader(root: Dir.pwd, default_model: MODEL, default_base_url: BASE_URL)",
+          advice: "Wire it into a harness: require_relative \"agents/file_reader\", then list " \
+            "file_reader(root: Dir.pwd, default_model: MODEL, default_base_url: BASE_URL) in TOOLS.",
+          description: "Agent-as-tool: a sub-agent that reads files so raw file text never enters the main context"
+        },
         "repl_harness" => {
           source: "harness/repl.rb",
           dest: "harness/repl.rb",

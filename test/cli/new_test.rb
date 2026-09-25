@@ -81,6 +81,24 @@ class NewTest < Minitest::Test
     end
   end
 
+  # The file reader agent (docs/design/tools-and-agents.md) is owned and
+  # non-optional — harness/repl.rb requires it, so a fresh scaffold must
+  # have it and it must load standalone, the same self-containment
+  # guarantee the tool files get above (mirrors test_planted_read_file_
+  # tool_is_self_contained), though this file isn't stdlib-only: it
+  # requires lib/lyman (planted alongside it).
+  def test_planted_file_reader_agent_loads_and_exposes_its_schema
+    in_tmpdir do
+      project = scaffold_project
+      script = 'require "./harness/agents/file_reader"; ' \
+        'tool = file_reader(root: Dir.pwd, default_model: "m", default_base_url: "http://example.invalid"); ' \
+        'print tool[:schema].dig("function", "name")'
+      out = IO.popen([RbConfig.ruby, "-e", script], chdir: project, &:read)
+
+      assert_equal "file_reader", out
+    end
+  end
+
   # Guards against a harness referencing a tool `new` never plants: every
   # Lyman::Tools.<x> this repo's own harnesses list must have a matching
   # registry artifact (by `wire:`) that isn't optional.

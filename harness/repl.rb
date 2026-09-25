@@ -24,6 +24,7 @@ require_relative "../lib/lyman"
 require_relative "repl/style"
 require_relative "repl/round_printer"
 require_relative "repl/tool_printer"
+require_relative "agents/file_reader"
 require "cli/ui"
 require "reline"
 
@@ -36,13 +37,21 @@ $stdout.sync = true
 BASE_URL = ENV.fetch("LYMAN_BASE_URL", "http://localhost:11434/v1")
 MODEL = ENV.fetch("LYMAN_MODEL", "gemma4:latest")
 
+# Constructed ahead of TOOLS: file_reader's trace: hook needs it to print
+# the sub-agent's nested tool activity indented under the outer ⚙ line.
+tool_printer = ToolPrinter.new
+
 # ── Tools: one file each in lib/lyman/tools/, schema and handler side by side ─
 # `lyman add <name>_tool` plants more; list them here to hand them to the model.
+# The main model asks, the sub-agent reads: search_files/read_file are the
+# reader's tools, not the main model's, so raw file text never enters the
+# main context — only file_reader's concise reply does.
 TOOLS = [
   Lyman::Tools.current_time,
-  # Read-only, confined to this project's working directory.
-  Lyman::Tools.search_files(root: Dir.pwd),
-  Lyman::Tools.read_file(root: Dir.pwd)
+  file_reader(
+    root: Dir.pwd, default_model: MODEL, default_base_url: BASE_URL,
+    trace: ->(c) { tool_printer.results(c, indent: 2) }
+  )
 ]
 
 schemas = TOOLS.map { |tool| tool[:schema] }
@@ -56,7 +65,6 @@ conversation = Lyman::Conversation.new(
 )
 rounds = [] # the circuit's queue — visible right here, not smuggled
 printer = RoundPrinter.new(MODEL)
-tool_printer = ToolPrinter.new
 
 # ── Context policy: what each round shows the model ─────────────────────────
 # The conversation keeps every element; this only shapes the wire projection.

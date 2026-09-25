@@ -248,6 +248,9 @@ class AddTest < Minitest::Test
     end
   end
 
+  # search_files and read_file are wired inside harness/agents/file_reader.rb
+  # (the file reader agent's own tools), not directly in harness/repl.rb, so
+  # these tests exercise that file rather than the root harness.
   def test_add_search_files_tool_gives_no_wiring_advice_when_a_harness_mentions_it
     in_tmpdir do
       scaffold_project("demo")
@@ -256,8 +259,8 @@ class AddTest < Minitest::Test
         manifest.delete_artifact("search_files_tool")
         manifest.save
         FileUtils.rm_f("lib/lyman/tools/search_files.rb")
-        # harness/repl.rb (planted by `new`) already lists Lyman::Tools.search_files.
-        assert_includes File.read("harness/repl.rb"), "Lyman::Tools.search_files"
+        # harness/agents/file_reader.rb (planted by `new`) already calls Lyman::Tools.search_files.
+        assert_includes File.read("harness/agents/file_reader.rb"), "Lyman::Tools.search_files"
 
         result = run_cli("add", "search_files_tool")
 
@@ -275,8 +278,8 @@ class AddTest < Minitest::Test
         manifest.delete_artifact("search_files_tool")
         manifest.save
         FileUtils.rm_f("lib/lyman/tools/search_files.rb")
-        contents = File.read("harness/repl.rb").gsub("Lyman::Tools.search_files(root: Dir.pwd)", "# removed for this test")
-        File.write("harness/repl.rb", contents)
+        contents = File.read("harness/agents/file_reader.rb").gsub("Lyman::Tools.search_files", "# removed for this test")
+        File.write("harness/agents/file_reader.rb", contents)
 
         result = run_cli("add", "search_files_tool")
 
@@ -296,7 +299,7 @@ class AddTest < Minitest::Test
         manifest.delete_artifact("read_file_tool")
         manifest.save
         FileUtils.rm_f("lib/lyman/tools/read_file.rb")
-        assert_includes File.read("harness/repl.rb"), "Lyman::Tools.read_file"
+        assert_includes File.read("harness/agents/file_reader.rb"), "Lyman::Tools.read_file"
 
         result = run_cli("add", "read_file_tool")
 
@@ -314,8 +317,8 @@ class AddTest < Minitest::Test
         manifest.delete_artifact("read_file_tool")
         manifest.save
         FileUtils.rm_f("lib/lyman/tools/read_file.rb")
-        contents = File.read("harness/repl.rb").gsub("Lyman::Tools.read_file(root: Dir.pwd)", "# removed for this test")
-        File.write("harness/repl.rb", contents)
+        contents = File.read("harness/agents/file_reader.rb").gsub("Lyman::Tools.read_file", "# removed for this test")
+        File.write("harness/agents/file_reader.rb", contents)
 
         result = run_cli("add", "read_file_tool")
 
