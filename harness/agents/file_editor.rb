@@ -67,9 +67,12 @@ FILE_EDITOR_INSTRUCTIONS = <<~TEXT
   Make exactly the change asked for — nothing more. No unrelated
   refactoring, renaming, or reformatting.
 
-  After each patch the result may report a check failure: fix what your
-  change caused. If a patch is refused, re-read those lines and retry
-  with the exact text.
+  A reply starting "Patched" or "Created" means the edit landed, even if
+  a check failure follows — never send the same patch again. Fix only
+  what your change caused: if the findings don't name a line you changed,
+  or give no detail at all, treat them as pre-existing — stop patching,
+  finish, and say the check still fails. If a patch is refused, re-read
+  those lines and retry with the exact text.
 
   You cannot run tests and must not try to; someone else runs them after
   you finish.
@@ -114,7 +117,7 @@ def file_editor(default_model:, default_base_url:, root: Dir.pwd, check: "bundle
         "description" => "Change files instead of patching them yourself. Pass `request` describing " \
           "the change — a sub-agent with its own tools finds the code, writes exact edits, and applies " \
           "them#{check_note}, so file text never enters your context. Prefer one small, coherent change " \
-          "per call#{test_note}. It will not fix failing tests — what to do about them is your call. " \
+          "per call#{test_note}.#{" It will not fix failing tests — what to do about them is your call." if tester} " \
           "The reply lists the changed files and any check failures that remain" \
           "#{", plus test output if the tests failed" if tester}.",
         "parameters" => {
