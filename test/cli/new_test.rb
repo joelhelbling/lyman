@@ -64,6 +64,19 @@ class NewTest < Minitest::Test
     end
   end
 
+  # The patch tool is stdlib-only and planted by default; one file, two
+  # factories (one per patch format), both loadable standalone.
+  def test_planted_patch_tool_is_self_contained
+    in_tmpdir do
+      project = scaffold_project
+      script = 'require "./lib/lyman/tools/patch"; ' \
+        'print [Lyman::Tools.search_replace, Lyman::Tools.apply_diff].map { |t| t[:schema].dig("function", "name") }.join(",")'
+      out = IO.popen([RbConfig.ruby, "-e", script], chdir: project, &:read)
+
+      assert_equal "search_replace,apply_diff", out
+    end
+  end
+
   # recall_tool is optional (it needs a store), so it isn't planted by
   # `new` — plant it with `add` to prove it's self-contained too: no
   # requires of sibling lyman files, so it can be planted/updated/ejected
