@@ -97,7 +97,7 @@ module the harness merely wires together.
 `gem "sqlite3"` to your `Gemfile` if it isn't already there — the
 `Gemfile` is owned by you, so lyman advises rather than edits it. Tools
 follow the same advise-don't-edit rule for wiring: `lyman add <name>_tool`
-plants the tool file and, if no harness already mentions it, reminds you
+plants the tool file and, if no harness already wires it (comments don't count), reminds you
 to add its factory call to your harness's `TOOLS` array — harnesses are
 owned, so lyman won't edit them for you. A tool can also depend on another
 artifact (`recall_tool` needs `store`, since `Lyman::Tools.recall` takes

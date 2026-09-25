@@ -120,6 +120,18 @@
   so a wide recall can't blow the very context it's meant to relieve.
   Closes part 5 of the context-control design (issue #12).
 
+### Fixed
+
+- **`lyman add`'s "planted but not wired" advice no longer goes quiet on
+  mere mentions.** The check ignores whole-line comments, so a
+  commented-out wiring line (`# Lyman::Tools.recall(store: store)`) now
+  gets the reminder (issue #27). It also skips the artifact's own file,
+  and no longer counts a name that follows a word character or a slash,
+  so an agent file defining its own factory, or a harness that only
+  `require_relative`s it, no longer counts as the agent being wired.
+  Trailing comments and `=begin`/`=end` blocks still count; handling them
+  would mean parsing Ruby.
+
 ## 0.3.0
 
 The harness archetypes and immutable conversation release. Lyman now ships
