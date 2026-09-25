@@ -138,6 +138,30 @@ only needs rewiring when the *workflow* changes shape (approval gates,
 fan-out, multi-model routing) — and then it's the same stock parts,
 re-plumbed, per the circuit-pattern note.
 
+## Shells inside shells
+
+The three archetypes are the whole set — but a shell can run *inside*
+another shell rather than as the top-level process, and that isn't a fourth
+archetype: it's one of the three, embedded.
+
+- **The compaction sidecar** (`harness/compactor.rb`) is a daemon-archetype
+  shell — a loop on an inbound stream that never ends — run in its own
+  `Thread` beside a root harness instead of as its own process.
+- **An agent-as-tool** (`docs/design/tools-and-agents.md`) is a
+  script-archetype shell — one work item, arriving with the launch, then
+  halt — run inside a tool handler instead of as its own `ruby` invocation.
+  The tool call's arguments play `ARGV`; the return value plays stdout.
+
+Both fit the archetype table without a new row: "where do work items come
+from" and "when does the process end" answer the same way whether the shell
+is launched by an init system or spawned by a thread/handler inside another
+process. What changes is only the launcher, which the archetype definition
+already puts out of scope — a script or daemon shell doesn't stop being one
+just because something else happens to start it. The payoff shows up in an
+agent-as-tool file being runnable standalone (`if __FILE__ ==
+$PROGRAM_NAME`): its prompt and model can be tuned directly by running the
+file, without coaxing the root model into calling it.
+
 ## Deployment notes
 
 - `lyman new` plants the **repl** — the archetype you can talk to sixty

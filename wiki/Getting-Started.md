@@ -70,7 +70,9 @@ my-agent/
 ├── Gemfile
 ├── harness/
 │   ├── repl.rb            # the wiring script — YOURS from day one
-│   └── repl/              # the repl's display layer, one widget per file
+│   ├── repl/              # the repl's display layer, one widget per file
+│   └── agents/
+│       └── file_reader.rb # agent-as-tool: extracts excerpts/outline/answer from a file
 ├── lib/
 │   ├── lyman.rb           # entry point; requires shifty + planted modules
 │   └── lyman/
@@ -127,10 +129,20 @@ model can call is listed by name:
 ```ruby
 TOOLS = [
   Lyman::Tools.current_time,
-  Lyman::Tools.search_files(root: Dir.pwd),
-  Lyman::Tools.read_file(root: Dir.pwd)
+  file_reader(root: Dir.pwd, default_model: MODEL, default_base_url: BASE_URL)
 ]
 ```
+
+Notice the repl hands the model `file_reader`, not `search_files`/
+`read_file` directly — `file_reader` is itself an **agent-as-tool**
+(`harness/agents/file_reader.rb`): given a path or glob and an optional
+query, it uses the primitives on the *reader's* own fresh conversation and
+returns only the excerpts, outline, or answer asked for. Raw file text
+never lands in your main conversation; only the concise request and result
+do. It's runnable on its own too —
+`ruby harness/agents/file_reader.rb lib/lyman/conversation.rb "how is finished? computed"`
+prints the answer on stdout, useful for tuning its prompt without going
+through the repl at all.
 
 Write your own the same way — a weather lookup, a database query, a
 shell command — in your own directory rather than `lib/lyman/` (that tree

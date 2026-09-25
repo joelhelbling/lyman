@@ -115,6 +115,18 @@ pipeline. Point it elsewhere with `LYMAN_BASE_URL` and `LYMAN_MODEL`.
   path is resolved with `File.realpath`, so `..` traversal and symlinks
   pointing outside it are refused — and every failure comes back as a
   message the model can read rather than an exception.
+- **An agent-as-tool is a script shell inside a handler, not a second
+  framework.** A tool handler that builds a fresh conversation, runs a
+  small circuit with its own tools and its own `max_rounds` runaway guard,
+  and returns the final answer *is* the script archetype, invoked
+  in-process — the same pattern as `harness/compactor.rb`, one level down.
+  `harness/agents/file_reader.rb` (planted by `lyman new`) is the first:
+  given a path/glob and an optional query, it delegates to a small model
+  only when there's something to extract, and returns just the excerpts,
+  outline, or answer asked for — so a large file's text is read once, by a
+  disposable sub-conversation, and never carried in the main context. It's
+  runnable standalone (`ruby harness/agents/file_reader.rb PATH [QUERY]`)
+  for tuning its prompt directly.
 - **Persistence is an opt-in splice, not a built-in.** `Lyman::Store` (SQLite,
   confined to its own file) gives a conversation a durable, addressable,
   full-text-searchable home; `Lyman::Workers.store_append` is the one
@@ -222,7 +234,8 @@ Early and moving. What exists today: the vision, circuit-pattern,
 harness-archetypes, and deployment design docs, the core `Conversation` item
 (an append-only element series), chat-completion and tool-execution workers,
 an optional SQLite `Store` with lineage and full-text search, the
-`search_files`/`read_file` file primitives, deterministic
+`search_files`/`read_file` file primitives, the agent-as-tool pattern with
+its first agent (`harness/agents/file_reader.rb`), deterministic
 wire-time `Abridgement` policies plus transport usage stamping, the three
 archetype harnesses (repl, daemon, script) working against live local
 models, and the generator CLI (`new` / `add` / `update` / `eject` / `diff` /

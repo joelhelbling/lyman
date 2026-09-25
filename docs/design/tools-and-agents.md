@@ -1,7 +1,8 @@
 # Design note: tools, and agents as tools
 
-**Status:** accepted direction; part 1 (plantable tools convention, issue
-#13) and part 3 (file primitives, issue #15) are implemented
+**Status:** accepted direction; parts 1–4 (plantable tools convention #13,
+agent-as-tool pattern #14, file primitives #15, file reader agent #16) are
+implemented
 **Tracked by:** the "tools" GitHub issues (tools convention, agent-as-tool,
 file primitives, file reader agent, patch tool, patch agent)
 
@@ -97,6 +98,44 @@ tool set, its own runaway guard, and a way for the outer display layer to
 show nested activity. The file reader and the patch agent are two wirings
 of it.
 
+**As built (issue #14).** Work arrives with the launch — tool-call args play
+`ARGV` — and the return value plays stdout; nothing about the shape changes
+by running inside a handler instead of a process. By the archetypes note's
+own definition (the archetype is the shell shape; the launcher is out of
+scope; the output channel is the script archetype's variable part), this
+isn't a fourth archetype — the same way `harness/compactor.rb` isn't: a
+daemon-archetype shell run in a thread. An agent-as-tool is deliberately an
+*owned Ruby file*, not a markdown/YAML agent definition — the latter would
+be a second paradigm, config read by a hidden runtime, which is exactly what
+"guts on the outside" rules out. The circuit is written out in the file, so
+it's spliceable like any harness: an abridgement policy, a store, a gate can
+all go in. Anatomy, common to every agent-as-tool:
+
+- a top-level factory method returning `{schema:, handler:}`, the same
+  shape as every other tool;
+- its own tool set, listed explicitly inside the file — its identity, and
+  the structural guarantee the (future) patch agent #17 relies on to keep
+  it from seeing tools it shouldn't;
+- a fresh conversation, `rounds` queue, and pipeline built per call ("a
+  memory is a splice, not a default" — nothing persists between calls
+  unless the agent deliberately wires one in);
+- its own runaway guard, the existing round counter via `max_rounds:`,
+  returning one short line on runaway rather than a flood of partial work
+  — the return value is the whole product a caller sees;
+- `trace:` — an optional callable given the inner conversation after each
+  round: the seam for nested display (the repl), logging, or persistence
+  (`->(c) { store.append(c) }`). It only observes; nothing it sees enters
+  the outer conversation. `nil` (the default) is silent, which is what a
+  daemon or script harness wants;
+- model settings via `model:` and `default_model:` (plus `base_url:`/
+  `default_base_url:`) — the harness passes its own `MODEL` constant as
+  `default_model:` because the agent file can't see the harness's
+  constant. How an agent resolves beyond that is its own business (see the
+  file reader below); a general config service is out of scope for now;
+- runnable standalone, `if __FILE__ == $PROGRAM_NAME` — the script
+  framing's practical payoff: an agent's prompt and model can be tuned
+  directly, without coaxing the main model into calling it.
+
 ## File access
 
 **Primitives** (plain handlers, no model):
@@ -133,6 +172,26 @@ shortcut. The query is what decides, not file size:
 - A query is present → always go through the reader, even for a small
   file. A small file with a question still deserves the part of the file
   that answers it.
+
+**As built (issue #16).** `harness/agents/file_reader.rb`, owned, planted
+by `lyman new` (registry `file_reader_agent`, needs `search_files_tool`/
+`read_file_tool`). Params: `path` (file or glob, required), `query`
+(optional), and `shape` — `excerpts` (default; relevant passages with
+`path:line` ranges, so the caller can follow up precisely), `outline`
+(symbols/sections with line numbers), or `answer` (short prose citing
+`path:line`). The caller names the shape it wants; the agent has one job,
+extract to that shape — no switching on file type. The routing rule above
+is decided in the handler *before* any model call: a no-query path that
+resolves to exactly one file skips the model entirely; a query, or several
+matched files, always delegates. Its tools are `search_files` and
+`read_file` (root-confined, #15) — the file primitives are the reader's
+tools now, not the main model's. `harness/repl.rb` lists
+`file_reader(root: Dir.pwd, default_model: MODEL, default_base_url:
+BASE_URL, trace: ...)` in `TOOLS` *instead of* `search_files`/`read_file`,
+so raw file text never enters the main conversation — enforced by the
+wiring, not a prompt. The repl shows nested activity indented under the
+tool call (`ToolPrinter` gained `indent:`), so the delegation is visible
+rather than a black box.
 
 ## Patching
 
@@ -192,10 +251,12 @@ What it costs, stated plainly:
 ## Order of work
 
 1. Plantable tools convention. **Done** (issue #13).
-2. Agent-as-tool pattern.
+2. Agent-as-tool pattern. **Done** (issue #14) — shipped together with #4,
+   since a toy agent would prove nothing; the reader is what proves the
+   pattern.
 3. File primitives. **Done** (issue #15) — landed before #2, so the
    agent-as-tool pattern will be built around a real sub-agent working
    real tools rather than a hypothetical.
-4. File reader agent.
+4. File reader agent. **Done** (issue #16).
 5. Patch tool.
 6. Patch agent.
