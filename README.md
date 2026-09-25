@@ -115,6 +115,15 @@ pipeline. Point it elsewhere with `LYMAN_BASE_URL` and `LYMAN_MODEL`.
   path is resolved with `File.realpath`, so `..` traversal and symlinks
   pointing outside it are refused — and every failure comes back as a
   message the model can read rather than an exception.
+- **Patching is a planted tool with a check seam.** `lib/lyman/tools/patch.rb`
+  holds two factories, one per patch format: `Lyman::Tools.search_replace`
+  (exact search-and-replace blocks, the default; robust for models that
+  can't reproduce line numbers) and `Lyman::Tools.apply_diff` (unified
+  diff, hunks placed by context). Wiring one is choosing the format. Each
+  applies one patch to one root-confined file, then runs `check:` — a
+  command like `"bundle exec standardrb"` (the touched path appended, run
+  as an argv, never through a shell), a callable, or `nil` — and reports
+  one word on a pass, the findings on a failure.
 - **An agent-as-tool is a script shell inside a handler, not a second
   framework.** A tool handler that builds a fresh conversation, runs a
   small circuit with its own tools and its own `max_rounds` runaway guard,
@@ -234,7 +243,8 @@ Early and moving. What exists today: the vision, circuit-pattern,
 harness-archetypes, and deployment design docs, the core `Conversation` item
 (an append-only element series), chat-completion and tool-execution workers,
 an optional SQLite `Store` with lineage and full-text search, the
-`search_files`/`read_file` file primitives, the agent-as-tool pattern with
+`search_files`/`read_file` file primitives, the `search_replace`/`apply_diff`
+patch tool with its post-edit check, the agent-as-tool pattern with
 its first agent (`harness/agents/file_reader.rb`), deterministic
 wire-time `Abridgement` policies plus transport usage stamping, the three
 archetype harnesses (repl, daemon, script) working against live local

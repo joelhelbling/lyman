@@ -64,7 +64,10 @@ source of truth for intent; this file is a summary plus working conventions.
   the `Workers` factories; `current_time` is the managed demo tool `lyman
   new` plants, `search_files` and `read_file` (both `root:`) are the file
   primitives and are managed but not optional — `lyman new` plants them
-  too, stdlib only, like `current_time` — and `recall` (`store:`)
+  too, stdlib only, like `current_time` — `patch` (`patch.rb`, registry
+  `patch_tool`) holds two factories, `search_replace` and `apply_diff`
+  (both `root:`, `check:`), one per patch format, managed and planted by
+  `new` but not yet wired into a harness — and `recall` (`store:`)
   re-expands abridged or compacted context and is managed but optional,
   since it needs a store). These files are
   both what this repo runs and what the generator plants into client

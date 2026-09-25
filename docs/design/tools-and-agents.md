@@ -1,10 +1,10 @@
 # Design note: tools, and agents as tools
 
-**Status:** accepted direction; parts 1–4 (plantable tools convention #13,
-agent-as-tool pattern #14, file primitives #15, file reader agent #16) are
-implemented
+**Status:** accepted direction; parts 1–5 (plantable tools convention #13,
+agent-as-tool pattern #14, file primitives #15, file reader agent #16,
+patch tool #18) are implemented
 **Tracked by:** the "tools" GitHub issues (tools convention, agent-as-tool,
-file primitives, file reader agent, patch tool, patch agent)
+file primitives, file reader agent, patch tool, file editor agent)
 
 ## The problem
 
@@ -95,7 +95,7 @@ returns the final answer *is* the script archetype (see
 [harness-archetypes.md](harness-archetypes.md)) invoked in-process. That
 single pattern underlies every agent below, so it is built once: its own
 tool set, its own runaway guard, and a way for the outer display layer to
-show nested activity. The file reader and the patch agent are two wirings
+show nested activity. The file reader and the file editor are two wirings
 of it.
 
 **As built (issue #14).** Work arrives with the launch — tool-call args play
@@ -114,7 +114,7 @@ all go in. Anatomy, common to every agent-as-tool:
 - a top-level factory method returning `{schema:, handler:}`, the same
   shape as every other tool;
 - its own tool set, listed explicitly inside the file — its identity, and
-  the structural guarantee the (future) patch agent #17 relies on to keep
+  the structural guarantee the (future) file editor #17 relies on to keep
   it from seeing tools it shouldn't;
 - a fresh conversation, `rounds` queue, and pipeline built per call ("a
   memory is a splice, not a default" — nothing persists between calls
@@ -195,29 +195,110 @@ rather than a black box.
 
 ## Patching
 
-**The patch tool** applies a patch to one file, then runs a configured
+**The patch tool** applies one patch to one file, then runs a configured
 check command (e.g. `standardrb`, `eslint`) on the touched file and
-returns its output. Two patch formats are supported, selected by
-configuration:
+returns its output. Two patch formats, as **two tool factories** rather
+than one factory with a `format:` switch — the format changes the tool's
+schema, not just its behavior, and a switch would be a mode where the
+rest of the design uses a choice of file or line:
 
 - **search-and-replace blocks** (the default) — robust against models
   that can't reproduce exact context lines and line numbers;
 - **unified diff** — for models that can; local models are improving
-  quickly enough that this should be a switch, not a rewrite.
+  quickly enough that this should be a choice of tool, not a rewrite.
 
-Language-server integration is deferred; the check command is the seam,
-and an LSP client can be an alternate implementation of it later.
+The two share the check step. The check is a seam: a string command (the
+touched path appended, run as an argv via `Open3`, never through a
+shell), a callable given the path, or `nil` for no check. It reports and
+does not rewrite by default — a `--fix` style check changes the file out
+from under the model's picture of it, so that is an opt-in. The model
+never supplies any part of the command; it is fixed at wiring time.
+Language-server integration is deferred; an LSP client can be an
+alternate callable later.
 
-**The patch agent** accepts a collection of patches, applies them all,
-checks, and then runs the tests. It may correct minor patch and check
-failures inside a bounded fix loop (the existing round counter is the
-bound). It must never attempt to fix a failing test — and that is enforced
-structurally, not by prompt: the agent's circuit has only apply and check
-tools; the tests run in a plain worker *after* the agent's circuit
-finishes, so the agent cannot react to their outcome.
+**As built (issue #18).** `lib/lyman/tools/patch.rb`, one managed file
+(registry `patch_tool`, planted by `lyman new`, stdlib only) holding both
+factories: `Lyman::Tools.search_replace(root:, check:)` and
+`Lyman::Tools.apply_diff(root:, check:)`. Root confinement works like
+`read_file`'s, extended to files that don't exist yet: the nearest
+existing ancestor is realpath'd, so a symlinked directory can't smuggle a
+new file outside the root. Nothing raises on model input; every failure
+is a message that says nothing was changed and what to send instead:
 
-Results are structured — per-patch status and check output — and follow
-"no news is good news": test output is included only when tests failed.
+- `search_replace` requires `search` to match exactly once. Several
+  matches are refused with their line numbers ("include more surrounding
+  lines"). No exact match, but one match ignoring whitespace, returns the
+  file's exact lines to resend — the tool shows the model its mistake
+  rather than guessing which indentation it meant. An empty `search`
+  creates a file (and never overwrites one).
+- `apply_diff` takes `path` explicitly and ignores the diff's `---`/`+++`
+  headers (models mangle the `a/`/`b/` prefixes). Hunks are placed by
+  their context and `-` lines, exact first and then ignoring trailing
+  whitespace; the `@@` line numbers only break ties between equal matches,
+  since models get numbers wrong far more often than text. Context lines
+  keep the file's own text, so a tolerant match never rewrites its
+  anchor. All hunks apply or none do; a multi-file diff is refused;
+  add-only hunks on a missing path create the file.
+- CRLF files are matched as LF (models send LF) and written back as CRLF.
+- The check: `nil` (no check), a command String or Array (split with
+  `Shellwords`, the touched path appended relative to root, run from root
+  with `Open3` — exit 0 passes), or a callable given the absolute path
+  and returning `nil`/`""` for a pass or its findings. The result is one
+  word on a pass and the (capped) findings on a failure; a command that
+  can't run says so rather than raising. The schema only mentions the
+  check when one is configured.
+
+**One patch at a time, not a batch.** An earlier plan had a batch-apply
+tool (a collection of patches in, apply all, check, test). It was
+dropped: the patches would already sit in the caller's context, so a
+batch saves little, and when a batch goes wrong it goes wrong across a
+larger surface that takes more analysis to untangle. Small changes,
+checked as they land, are the better habit.
+
+**The file editor** (issue #17) is the write-side twin of the file
+reader: the caller hands it a prompt describing a change, and a
+sub-agent with its own `search_files`, `read_file`, and patch tools finds
+the code, writes the exact edits, applies them, and checks them. The
+point is the same as the reader's — raw file text stays out of the
+caller's context, in both directions now — plus one the reader doesn't
+have: small local models are bad at reproducing exact context lines, so
+turning "in `#bar`, make the loop a `map`" into a patch that applies is
+work worth delegating.
+
+The prompt can be narrow (a location plus an intent) or broad (a goal
+across files); that is a spectrum, not two modes, and the name
+`file_editor` is what tells the calling model how to prompt it. A
+markedly different editing strategy is a different agent file, not a
+mode of this one.
+
+It may correct its own patch and check failures inside a bounded fix
+loop (the existing round counter is the bound). It must never attempt to
+fix a failing test — and that is enforced structurally, not by prompt:
+the agent's circuit has no tool that runs tests; the tests run in a
+plain worker *after* the circuit finishes, so the agent cannot react to
+their outcome. The scope of one `file_editor` call is therefore the
+"change" the tests run after — which is an argument for prompting it
+with small changes.
+
+Configuration follows the file reader's precedent: the harness declares
+its settings as constants beside `MODEL` and hands them in as factory
+arguments — `file_editor(check: CHECK_COMMAND, test: TEST_COMMAND,
+default_model: MODEL, ...)` — and the editor passes `check:` on to the
+patch tool it builds inside its own file. No config file, no shared
+settings object.
+
+Results follow "no news is good news": what changed and any check output
+that remains; test output only when tests failed.
+
+**Open question: does sequestering reading and writing fragment
+context?** The reader and the editor each keep raw file text out of the
+caller's context, but a larger effort may need reading and writing to
+cohere in one place. It may turn out that general-purpose sub-agents,
+each owning one coherent slice of a decomposed task, are the better unit
+— and wire-time abridgement and sidecar compaction
+([context-control.md](context-control.md)) are a competing strategy for
+the same problem. Not answerable on paper; the plan is to use the reader
+and the editor in realistic sessions and see.
 
 ## Developer experience: what changes, and what it costs
 
@@ -233,7 +314,7 @@ What gets better:
   documented pattern, "write a sub-agent" means writing a script-shaped
   wiring inside a handler. There is no second framework to learn, and the
   same runaway guard protects it.
-- **Structural guarantees replace prompt discipline.** The patch agent
+- **Structural guarantees replace prompt discipline.** The file editor
   cannot fix failing tests because it has no tool that sees them.
   Developers can trust a property of the wiring instead of hoping the
   model obeys an instruction.
@@ -258,5 +339,5 @@ What it costs, stated plainly:
    agent-as-tool pattern will be built around a real sub-agent working
    real tools rather than a hypothetical.
 4. File reader agent. **Done** (issue #16).
-5. Patch tool.
-6. Patch agent.
+5. Patch tool. **Done** (issue #18).
+6. File editor agent (issue #17).
