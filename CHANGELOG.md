@@ -4,6 +4,25 @@
 
 ### Added
 
+- **Patch tool** (`lib/lyman/tools/patch.rb`, registry `patch_tool`,
+  planted by `lyman new`, stdlib only): two factories, one per patch
+  format — `Lyman::Tools.search_replace(root:, check:)` (exact
+  search-and-replace blocks, the default) and
+  `Lyman::Tools.apply_diff(root:, check:)` (unified diff) — sharing the
+  check step, so choosing a format is choosing which one to list in
+  `TOOLS`. Each applies one patch to one file, root-confined (including
+  new files, via their nearest existing ancestor), and never raises on
+  model input. `search_replace` refuses ambiguous matches with their line
+  numbers, answers a whitespace-only near miss with the exact lines to
+  resend, and creates a file from an empty `search`. `apply_diff` places
+  hunks by context (line numbers only break ties), tolerates trailing
+  whitespace without rewriting context, applies all hunks or none, and
+  refuses multi-file diffs. CRLF files round-trip. `check:` is a command
+  String/Array (touched path appended, argv via `Open3`, no shell), a
+  callable given the absolute path, or `nil`; the result is "Check:
+  passed." or the findings. Not wired into any harness yet — the file
+  editor agent (#17) will build it internally. Closes part 5 of the
+  tools-and-agents design (issue #18).
 - **Agent-as-tool, and the file reader agent** (`harness/agents/file_reader.rb`,
   planted by `lyman new`, registry `file_reader_agent`): an agent-as-tool is
   the script archetype run inside a tool handler — the work item arrives

@@ -83,7 +83,8 @@ my-agent/
 │       └── tools/
 │           ├── current_time.rb        # one tool, schema + handler side by side
 │           ├── search_files.rb        # search a tree by content or file name, confined to root:
-│           └── read_file.rb           # read a file, optionally by line range, confined to root:
+│           ├── read_file.rb           # read a file, optionally by line range, confined to root:
+│           └── patch.rb               # search_replace / apply_diff: patch one file, then run a check
 └── .lyman/manifest.yml    # what was planted, at which version — commit it
 ```
 
