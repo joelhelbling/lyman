@@ -294,6 +294,8 @@ class AddTest < Minitest::Test
     end
   end
 
+  # ...while the stock repl, which lists file_editor(...) in TOOLS, still
+  # counts as wiring it.
   def test_add_file_editor_agent_gives_no_wiring_advice_when_the_repl_wires_it
     in_tmpdir do
       scaffold_project("demo")

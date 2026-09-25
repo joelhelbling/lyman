@@ -89,10 +89,11 @@ module Lyman
         # Whole-line comments are ignored — harnesses are owned and heavily
         # commented, and a commented-out wiring line is exactly the case the
         # reminder is for. Trailing comments and =begin/=end blocks still
-        # count: handling those properly means parsing Ruby, too heavy for a
-        # reminder. The artifact's own file is skipped too, since an agent
-        # file defines (and documents) the very factory its `wire:` names —
-        # a file never wires itself.
+        # count, and a #-leading line inside a heredoc is dropped as if it
+        # were a comment: handling those properly means parsing Ruby, too
+        # heavy for a reminder. The artifact's own file is skipped too — a
+        # file never wires itself, and a planted file can mention its own
+        # `wire:` factory (an agent file defines and documents it).
         def any_harness_mentions?(project_root, wire, except: nil)
           call = %r{(?<![\w/])#{Regexp.escape(wire.sub(/\(.*\z/m, ""))}\b}
           own = File.join(project_root, except) if except
