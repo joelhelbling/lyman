@@ -1,8 +1,8 @@
 # Design note: tools, and agents as tools
 
-**Status:** accepted direction; parts 1–5 (plantable tools convention #13,
-agent-as-tool pattern #14, file primitives #15, file reader agent #16,
-patch tool #18) are implemented
+**Status:** accepted direction; all six parts (plantable tools convention
+#13, agent-as-tool pattern #14, file primitives #15, file reader agent #16,
+patch tool #18, file editor agent #17) are implemented
 **Tracked by:** the "tools" GitHub issues (tools convention, agent-as-tool,
 file primitives, file reader agent, patch tool, file editor agent)
 
@@ -114,8 +114,8 @@ all go in. Anatomy, common to every agent-as-tool:
 - a top-level factory method returning `{schema:, handler:}`, the same
   shape as every other tool;
 - its own tool set, listed explicitly inside the file — its identity, and
-  the structural guarantee the (future) file editor #17 relies on to keep
-  it from seeing tools it shouldn't;
+  the structural guarantee the file editor #17 relies on to keep it from
+  seeing tools it shouldn't;
 - a fresh conversation, `rounds` queue, and pipeline built per call ("a
   memory is a splice, not a default" — nothing persists between calls
   unless the agent deliberately wires one in);
@@ -290,6 +290,59 @@ settings object.
 Results follow "no news is good news": what changed and any check output
 that remains; test output only when tests failed.
 
+**As built (issue #17).** `harness/agents/file_editor.rb`, owned, planted
+by `lyman new` (registry `file_editor_agent`, needs `search_files_tool`,
+`read_file_tool`, `patch_tool`). One param, `request` — a prompt
+describing the change. The factory is `file_editor(default_model:,
+default_base_url:, root: Dir.pwd, check: "bundle exec standardrb", test:
+"bundle exec rake test", model: nil, base_url: nil, max_rounds: 12,
+trace: nil)`, with `LYMAN_FILE_EDITOR_MODEL`/`LYMAN_FILE_EDITOR_BASE_URL`
+overrides resolved like the reader's. `check:` takes the patch tool's
+forms; `test:` is a command String/Array run from root (argv, no shell),
+a callable returning `nil` or a failure string, or `nil`. Both are
+normalized at wiring time, so a bad type raises `ArgumentError` there
+rather than on the model's first call. The sub-agent's tools are
+`search_files`, `read_file`, and `search_replace` — switching it to
+unified diffs is editing the one line that builds the patch tool to
+`apply_diff`.
+
+- **The trailing stages are the guarantee.** Two `relay_worker` stages
+  follow the circuit's `filter_worker`: one builds a `FileEditor::Outcome`
+  (a `Data` value) and re-checks each changed file, the next runs the
+  tests once — only if something changed and a runner is set. Nothing
+  downstream of the filter feeds `rounds`, so no model request can carry
+  test output. The placement in the pipeline *is* the enforcement.
+- **Changed files are tracked by bytes, not by reading replies.** The
+  patch handler is wrapped to snapshot the target file before and after;
+  the patch tool's wording stays its own business.
+- **The re-check sweep** reruns the check on every changed file after the
+  circuit finishes, since the agent may have given up on a failure; any
+  that still fail are reported.
+- **A runaway still reports and still tests.** Unlike the reader, where a
+  runaway returns one short line, the editor may already have changed
+  files — so the caller gets "stopped after N rounds before finishing —
+  the change may be partial.", followed by the changed files and the test
+  result. The caller needs to know what state the tree is in.
+- **The report:** the agent's one- or two-sentence summary (or the
+  runaway line), `Changed: …` or `No files were changed.`, `Check still
+  failing —` with findings per file, then `Tests: passed.` or `Tests:
+  failed —` plus the output, tail kept (test runners summarize last),
+  capped at 4000 chars. No test line when nothing changed.
+
+`harness/repl.rb` lists `file_editor(root: Dir.pwd, check: CHECK_COMMAND,
+test: TEST_COMMAND, default_model: MODEL, default_base_url: BASE_URL,
+trace: ...)` in `TOOLS` after `file_reader`, with `CHECK_COMMAND = "bundle
+exec standardrb"` and `TEST_COMMAND = "bundle exec rake test"` declared
+beside `MODEL`. The patch tool is the editor's, not the main model's, so
+raw file text stays out of the main conversation in both directions.
+Standalone, `ruby harness/agents/file_editor.rb "REQUEST"` edits files
+under the cwd for real (report on stdout, inner tool trace on stderr),
+using the factory defaults — so it expects a Bundler project with
+standardrb and a rake test task. Verified live with `gemma4:latest`:
+`search_files` → `read_file` → `search_replace`, applied, tests passed;
+a follow-up change that broke a test came back `Tests: failed`, and the
+model never saw it.
+
 **Open question: does sequestering reading and writing fragment
 context?** The reader and the editor each keep raw file text out of the
 caller's context, but a larger effort may need reading and writing to
@@ -340,4 +393,4 @@ What it costs, stated plainly:
    real tools rather than a hypothetical.
 4. File reader agent. **Done** (issue #16).
 5. Patch tool. **Done** (issue #18).
-6. File editor agent (issue #17).
+6. File editor agent. **Done** (issue #17).

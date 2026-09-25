@@ -72,7 +72,8 @@ my-agent/
 │   ├── repl.rb            # the wiring script — YOURS from day one
 │   ├── repl/              # the repl's display layer, one widget per file
 │   └── agents/
-│       └── file_reader.rb # agent-as-tool: extracts excerpts/outline/answer from a file
+│       ├── file_reader.rb # agent-as-tool: extracts excerpts/outline/answer from a file
+│       └── file_editor.rb # agent-as-tool: makes a described change, then runs the tests
 ├── lib/
 │   ├── lyman.rb           # entry point; requires shifty + planted modules
 │   └── lyman/
@@ -130,7 +131,9 @@ model can call is listed by name:
 ```ruby
 TOOLS = [
   Lyman::Tools.current_time,
-  file_reader(root: Dir.pwd, default_model: MODEL, default_base_url: BASE_URL)
+  file_reader(root: Dir.pwd, default_model: MODEL, default_base_url: BASE_URL),
+  file_editor(root: Dir.pwd, check: CHECK_COMMAND, test: TEST_COMMAND,
+    default_model: MODEL, default_base_url: BASE_URL)
 ]
 ```
 
@@ -144,6 +147,16 @@ do. It's runnable on its own too —
 `ruby harness/agents/file_reader.rb lib/lyman/conversation.rb "how is finished? computed"`
 prints the answer on stdout, useful for tuning its prompt without going
 through the repl at all.
+
+`file_editor` (`harness/agents/file_editor.rb`) is its write-side twin:
+the model describes a change, and the editor's sub-agent finds the code,
+patches it, and fixes any lint failures its patch caused. The tests
+(`TEST_COMMAND`, beside `CHECK_COMMAND` near the top of `repl.rb` — set
+them to your project's commands, or `nil` to skip) run *after* the
+sub-agent finishes, so it can't see them or bend code to pass them; the
+model gets back what changed, and test output only if the tests failed.
+`ruby harness/agents/file_editor.rb "REQUEST"` runs it on its own — it
+edits files under the current directory for real.
 
 Write your own the same way — a weather lookup, a database query, a
 shell command — in your own directory rather than `lib/lyman/` (that tree
