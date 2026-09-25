@@ -8,13 +8,15 @@ require_relative "style"
 class ToolPrinter
   RESULT_WIDTH = 60
 
-  def calls(conversation)
+  def calls(conversation, indent: 0)
+    pad = " " * indent
     conversation.pending_tool_calls.each do |tool_call|
-      puts gray("  ⚙ #{tool_call.dig("function", "name")} #{tool_call.dig("function", "arguments")}")
+      puts gray("#{pad}  ⚙ #{tool_call.dig("function", "name")} #{tool_call.dig("function", "arguments")}")
     end
   end
 
-  def results(conversation)
+  def results(conversation, indent: 0)
+    pad = " " * indent
     elements = conversation.elements
     reply_start = elements.rindex { |e| e.type == "assistant" }
     return unless reply_start
@@ -26,7 +28,7 @@ class ToolPrinter
     reply.each do |element|
       next unless element.type == "tool_result"
       summary = gray("#{names[element.content["tool_call_id"]]} → #{summarize(element.content["text"])}")
-      puts "  #{CLI::UI.fmt("{{v}}")} #{summary}"
+      puts "#{pad}  #{CLI::UI.fmt("{{v}}")} #{summary}"
     end
   end
 
