@@ -249,8 +249,9 @@ class AddTest < Minitest::Test
   end
 
   # search_files and read_file are wired inside harness/agents/file_reader.rb
-  # (the file reader agent's own tools), not directly in harness/repl.rb, so
-  # these tests exercise that file rather than the root harness.
+  # and harness/agents/file_editor.rb (the agents' own tools), not directly
+  # in harness/repl.rb, so these tests exercise those files rather than the
+  # root harness.
   def test_add_search_files_tool_gives_no_wiring_advice_when_a_harness_mentions_it
     in_tmpdir do
       scaffold_project("demo")
@@ -278,8 +279,9 @@ class AddTest < Minitest::Test
         manifest.delete_artifact("search_files_tool")
         manifest.save
         FileUtils.rm_f("lib/lyman/tools/search_files.rb")
-        contents = File.read("harness/agents/file_reader.rb").gsub("Lyman::Tools.search_files", "# removed for this test")
-        File.write("harness/agents/file_reader.rb", contents)
+        %w[harness/agents/file_reader.rb harness/agents/file_editor.rb].each do |agent|
+          File.write(agent, File.read(agent).gsub("Lyman::Tools.search_files", "# removed for this test"))
+        end
 
         result = run_cli("add", "search_files_tool")
 
@@ -291,10 +293,9 @@ class AddTest < Minitest::Test
     end
   end
 
-  # Nothing wires the patch tool yet (the file editor agent will), so
-  # re-adding it advises the wiring line — and names both formats, since
-  # wiring it means choosing one.
-  def test_add_patch_tool_advises_wiring_and_names_both_formats
+  # The patch tool is wired inside harness/agents/file_editor.rb (the file
+  # editor agent's own tool), so re-adding it gives no wiring advice...
+  def test_add_patch_tool_gives_no_wiring_advice_when_the_file_editor_wires_it
     in_tmpdir do
       scaffold_project("demo")
       Dir.chdir("demo") do
@@ -302,11 +303,33 @@ class AddTest < Minitest::Test
         manifest.delete_artifact("patch_tool")
         manifest.save
         FileUtils.rm_f("lib/lyman/tools/patch.rb")
+        assert_includes File.read("harness/agents/file_editor.rb"), "Lyman::Tools.search_replace"
 
         result = run_cli("add", "patch_tool")
 
         assert_equal 0, result.status
         assert File.exist?("lib/lyman/tools/patch.rb")
+        refute_includes result.out, "not wired"
+      end
+    end
+  end
+
+  # ...and when nothing wires it, the advice names both formats, since
+  # wiring it means choosing one.
+  def test_add_patch_tool_advises_wiring_and_names_both_formats_when_nothing_wires_it
+    in_tmpdir do
+      scaffold_project("demo")
+      Dir.chdir("demo") do
+        manifest = Lyman::CLI::Manifest.load(Dir.pwd)
+        manifest.delete_artifact("patch_tool")
+        manifest.save
+        FileUtils.rm_f("lib/lyman/tools/patch.rb")
+        contents = File.read("harness/agents/file_editor.rb").gsub("Lyman::Tools.search_replace", "# removed for this test")
+        File.write("harness/agents/file_editor.rb", contents)
+
+        result = run_cli("add", "patch_tool")
+
+        assert_equal 0, result.status
         assert_includes result.out, "not wired"
         assert_includes result.out, "Lyman::Tools.search_replace"
         assert_includes result.out, "Lyman::Tools.apply_diff"
@@ -340,8 +363,9 @@ class AddTest < Minitest::Test
         manifest.delete_artifact("read_file_tool")
         manifest.save
         FileUtils.rm_f("lib/lyman/tools/read_file.rb")
-        contents = File.read("harness/agents/file_reader.rb").gsub("Lyman::Tools.read_file", "# removed for this test")
-        File.write("harness/agents/file_reader.rb", contents)
+        %w[harness/agents/file_reader.rb harness/agents/file_editor.rb].each do |agent|
+          File.write(agent, File.read(agent).gsub("Lyman::Tools.read_file", "# removed for this test"))
+        end
 
         result = run_cli("add", "read_file_tool")
 

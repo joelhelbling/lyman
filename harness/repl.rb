@@ -25,6 +25,7 @@ require_relative "repl/style"
 require_relative "repl/round_printer"
 require_relative "repl/tool_printer"
 require_relative "agents/file_reader"
+require_relative "agents/file_editor"
 require "cli/ui"
 require "reline"
 
@@ -37,21 +38,33 @@ $stdout.sync = true
 BASE_URL = ENV.fetch("LYMAN_BASE_URL", "http://localhost:11434/v1")
 MODEL = ENV.fetch("LYMAN_MODEL", "gemma4:latest")
 
-# Constructed ahead of TOOLS: file_reader's trace: hook needs it to print
-# the sub-agent's nested tool activity indented under the outer ⚙ line.
+# The file editor's lint and test commands. Settings live here, in the
+# harness, and are handed in as factory arguments — edit them for your
+# project (nil skips either).
+CHECK_COMMAND = "bundle exec standardrb"
+TEST_COMMAND = "bundle exec rake test"
+
+# Constructed ahead of TOOLS: the agents' trace: hooks need it to print
+# each sub-agent's nested tool activity indented under the outer ⚙ line.
 tool_printer = ToolPrinter.new
 
 # ── Tools: one file each in lib/lyman/tools/, schema and handler side by side ─
 # `lyman add <name>_tool` plants more; list them here to hand them to the model.
-# The main model asks, the sub-agent reads: search_files/read_file are the
-# reader's tools, not the main model's, so raw file text never enters the
-# main context — only file_reader's concise reply does. Want the model to
-# read files directly too? List the read_file and search_files tools here
-# (their wiring lines are in harness/agents/file_reader.rb).
+# The main model asks, the sub-agents read and write: search_files/
+# read_file are the reader's and editor's tools, and the patch tool is the
+# editor's, not the main model's — so raw file text never enters the main
+# context in either direction, only the agents' concise replies do. Want
+# the model to read or patch files directly too? List those tools here
+# (their wiring lines are in harness/agents/).
 TOOLS = [
   Lyman::Tools.current_time,
   file_reader(
     root: Dir.pwd, default_model: MODEL, default_base_url: BASE_URL,
+    trace: ->(c) { tool_printer.results(c, indent: 2) }
+  ),
+  file_editor(
+    root: Dir.pwd, check: CHECK_COMMAND, test: TEST_COMMAND,
+    default_model: MODEL, default_base_url: BASE_URL,
     trace: ->(c) { tool_printer.results(c, indent: 2) }
   )
 ]
