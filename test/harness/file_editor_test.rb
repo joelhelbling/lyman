@@ -116,6 +116,8 @@ class FileEditorTest < Minitest::Test
     assert_includes with, "test-it"
     refute_includes without, "running"
     refute_includes without, "tests run"
+    assert_includes with, "will not fix failing tests"
+    refute_includes without, "failing tests"
   end
 
   def test_blank_request_is_refused_without_contacting_a_model
