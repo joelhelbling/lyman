@@ -99,6 +99,16 @@ class FileReaderTest < Minitest::Test
     end
   end
 
+  def test_routing_bypass_resolves_a_glob_matching_exactly_one_file
+    with_tree("a.txt" => "only file contents here\n", "b.rb" => "x\n") do |root|
+      tool = file_reader(root: root, default_model: "m", default_base_url: UNREACHABLE_BASE_URL)
+
+      result = tool[:handler].call({"path" => "*.txt"})
+
+      assert_includes result, "only file contents here"
+    end
+  end
+
   def test_routing_bypass_returns_a_large_file_untruncated
     content = (1..2000).map { |i| "line #{i} #{"x" * 20}" }.join("\n")
     with_tree("big.txt" => content) do |root|
@@ -209,6 +219,20 @@ class FileReaderTest < Minitest::Test
         result = tool[:handler].call({"path" => "f.txt", "query" => "q"})
 
         assert_equal "f.txt:1-1: hi", result
+      end
+    end
+  end
+
+  # An empty reply isn't a runaway, so it mustn't be reported as one.
+  def test_an_empty_final_reply_says_so_without_claiming_a_runaway
+    with_tree("f.txt" => "hi\n") do |root|
+      with_server([final_message("")]) do |base_url, _bodies|
+        tool = file_reader(root: root, default_model: "m", default_base_url: base_url)
+
+        result = tool[:handler].call({"path" => "f.txt", "query" => "q"})
+
+        assert_includes result, "finished without an answer"
+        refute_match(/stopped after/, result)
       end
     end
   end
