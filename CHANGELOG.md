@@ -4,6 +4,34 @@
 
 ### Added
 
+- **File editor agent** (`harness/agents/file_editor.rb`, planted by
+  `lyman new`, registry `file_editor_agent`, needs `search_files_tool`,
+  `read_file_tool`, `patch_tool`): the file reader's write-side twin. One
+  param, `request`, describing the change; a sub-agent finds the code with
+  `search_files`/`read_file` and edits it with `search_replace` (swap to
+  `apply_diff` by editing one line), fixing its own patch and check
+  failures within `max_rounds` (default 12). Tests are out of its reach
+  structurally: two `relay_worker` stages after the circuit's
+  `filter_worker` re-check each changed file and run the tests once (only
+  if something changed), and nothing downstream of the filter feeds the
+  model. Changed files are tracked by comparing bytes before/after each
+  patch. The report: the agent's summary (or a runaway line — the change
+  may be partial, so changes are still listed and tests still run),
+  `Changed: …` / `No files were changed.`, any `Check still failing —`
+  findings, and `Tests: passed.` or `Tests: failed —` with the output's
+  tail (4000 chars). Factory `file_editor(default_model:,
+  default_base_url:, root:, check: "bundle exec standardrb", test: "bundle
+  exec rake test", model:, base_url:, max_rounds:, trace:)`; `test:` is a
+  command String/Array (argv from root, no shell), a callable returning
+  `nil` or a failure string, or `nil`, and bad `check:`/`test:` types
+  raise `ArgumentError` at wiring time. `LYMAN_FILE_EDITOR_MODEL` /
+  `LYMAN_FILE_EDITOR_BASE_URL` override the model. Runnable standalone
+  (`ruby harness/agents/file_editor.rb "REQUEST"`, report on stdout,
+  inner tool activity on stderr — it edits files under the cwd for real).
+  `harness/repl.rb` lists `file_editor` in `TOOLS` after `file_reader`,
+  with new `CHECK_COMMAND` / `TEST_COMMAND` constants it hands in, so the
+  patch tool is the editor's, not the main model's. Closes part 6 of the
+  tools-and-agents design (issue #17).
 - **Patch tool** (`lib/lyman/tools/patch.rb`, registry `patch_tool`,
   planted by `lyman new`, stdlib only): two factories, one per patch
   format — `Lyman::Tools.search_replace(root:, check:)` (exact
@@ -20,8 +48,8 @@
   refuses multi-file diffs. CRLF files round-trip. `check:` is a command
   String/Array (touched path appended, argv via `Open3`, no shell), a
   callable given the absolute path, or `nil`; the result is "Check:
-  passed." or the findings. Not wired into any harness yet — the file
-  editor agent (#17) will build it internally. Closes part 5 of the
+  passed." or the findings. Not handed to the main model directly — the
+  file editor agent (#17) builds it internally. Closes part 5 of the
   tools-and-agents design (issue #18).
 - **Agent-as-tool, and the file reader agent** (`harness/agents/file_reader.rb`,
   planted by `lyman new`, registry `file_reader_agent`): an agent-as-tool is

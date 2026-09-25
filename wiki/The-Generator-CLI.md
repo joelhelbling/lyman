@@ -86,6 +86,7 @@ module the harness merely wires together.
 | `read_file_tool` | `Lyman::Tools.read_file(root:)` — line-numbered file reads, optionally by range — managed, planted by `new` |
 | `patch_tool` | `Lyman::Tools.search_replace(root:, check:)` and `Lyman::Tools.apply_diff(root:, check:)` — patch one file (search/replace blocks or unified diff), then run a check command or callable on it — managed, planted by `new` |
 | `file_reader_agent` | `harness/agents/file_reader.rb` — agent-as-tool that extracts excerpts/outline/answer from a file or glob, so raw file text stays out of the main conversation — owned, planted by `new` (needs `search_files_tool`/`read_file_tool`) |
+| `file_editor_agent` | `harness/agents/file_editor.rb` — agent-as-tool that makes a described change with the patch tool, then runs the tests outside its reach and reports what changed — owned, planted by `new` (needs `search_files_tool`/`read_file_tool`/`patch_tool`) |
 | `store` | `Lyman::Store` — SQLite conversation persistence with lineage and full-text search; the only file that knows `sqlite3` exists — managed, opt-in: `lyman add store` |
 | `store_append` | the `side_worker` that splices a `store` into a circuit — managed, opt-in: `lyman add store_append` |
 | `recall_tool` | `Lyman::Tools.recall(store:)` — re-expands abridged or compacted context by address or search — managed, opt-in: `lyman add recall_tool` (needs `store`) |

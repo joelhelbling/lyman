@@ -123,7 +123,8 @@ pipeline. Point it elsewhere with `LYMAN_BASE_URL` and `LYMAN_MODEL`.
   applies one patch to one root-confined file, then runs `check:` — a
   command like `"bundle exec standardrb"` (the touched path appended, run
   as an argv, never through a shell), a callable, or `nil` — and reports
-  one word on a pass, the findings on a failure.
+  one word on a pass, the findings on a failure. It isn't handed to the
+  main model; the file editor agent (below) builds it internally.
 - **An agent-as-tool is a script shell inside a handler, not a second
   framework.** A tool handler that builds a fresh conversation, runs a
   small circuit with its own tools and its own `max_rounds` runaway guard,
@@ -135,7 +136,14 @@ pipeline. Point it elsewhere with `LYMAN_BASE_URL` and `LYMAN_MODEL`.
   outline, or answer asked for — so a large file's text is read once, by a
   disposable sub-conversation, and never carried in the main context. It's
   runnable standalone (`ruby harness/agents/file_reader.rb PATH [QUERY]`)
-  for tuning its prompt directly.
+  for tuning its prompt directly. `harness/agents/file_editor.rb` (also
+  planted by `new`) is its write-side twin: given a prompt describing a
+  change, its sub-agent finds the code, patches it with `search_replace`,
+  and may fix its own check failures — but the tests run in a plain stage
+  *after* its circuit finishes, so the agent structurally cannot see or
+  "fix" them. The caller gets a short report: what changed, any check
+  failures left, and test output only if the tests failed. Standalone:
+  `ruby harness/agents/file_editor.rb "REQUEST"` (edits files for real).
 - **Persistence is an opt-in splice, not a built-in.** `Lyman::Store` (SQLite,
   confined to its own file) gives a conversation a durable, addressable,
   full-text-searchable home; `Lyman::Workers.store_append` is the one
@@ -245,7 +253,8 @@ harness-archetypes, and deployment design docs, the core `Conversation` item
 an optional SQLite `Store` with lineage and full-text search, the
 `search_files`/`read_file` file primitives, the `search_replace`/`apply_diff`
 patch tool with its post-edit check, the agent-as-tool pattern with
-its first agent (`harness/agents/file_reader.rb`), deterministic
+its first two agents (`harness/agents/file_reader.rb` and
+`harness/agents/file_editor.rb`), deterministic
 wire-time `Abridgement` policies plus transport usage stamping, the three
 archetype harnesses (repl, daemon, script) working against live local
 models, and the generator CLI (`new` / `add` / `update` / `eject` / `diff` /

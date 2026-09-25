@@ -32,7 +32,10 @@ source of truth for intent; this file is a summary plus working conventions.
   the other two archetypes against the same endpoint.
   `ruby harness/agents/file_reader.rb PATH [QUERY] [SHAPE]` runs the file
   reader agent standalone (answer on stdout, inner tool activity on stderr) —
-  the same file the repl calls as a tool.
+  the same file the repl calls as a tool. `ruby harness/agents/file_editor.rb
+  "REQUEST"` does the same for the file editor agent (report on stdout) —
+  it edits files under the cwd for real and runs `bundle exec standardrb` /
+  `bundle exec rake test` there.
 - `bundle exec exe/lyman` — the generator CLI (`new` / `add` / `update` /
   `eject` / `diff` / `doctor` / `list`). `LYMAN_SOURCE_ROOT` points it at an
   alternate artifact-source tree — how tests simulate a newer lyman release.
@@ -67,7 +70,8 @@ source of truth for intent; this file is a summary plus working conventions.
   too, stdlib only, like `current_time` — `patch` (`patch.rb`, registry
   `patch_tool`) holds two factories, `search_replace` and `apply_diff`
   (both `root:`, `check:`), one per patch format, managed and planted by
-  `new` but not yet wired into a harness — and `recall` (`store:`)
+  `new` and wired inside the file editor agent rather than handed to the
+  main model — and `recall` (`store:`)
   re-expands abridged or compacted context and is managed but optional,
   since it needs a store). These files are
   both what this repo runs and what the generator plants into client
@@ -104,10 +108,14 @@ source of truth for intent; this file is a summary plus working conventions.
   holds agent-as-tool files the same way: a script-archetype shell run
   inside a tool handler rather than a fourth archetype — owned, one file
   per agent, its own tool set declared inside it. `file_reader.rb`
-  (registry `file_reader_agent`) is the first, planted by `new`; the repl
-  hands the model `file_reader` in `TOOLS` rather than the `search_files`/
-  `read_file` primitives directly, so raw file text stays out of the main
-  conversation.
+  (registry `file_reader_agent`) is the first, planted by `new`;
+  `file_editor.rb` (registry `file_editor_agent`, also planted by `new`)
+  is the second — it makes a described change with the patch tool, and
+  runs the tests in a stage after its circuit, out of the sub-agent's
+  reach. The repl hands the model `file_reader` and `file_editor` in
+  `TOOLS` (with `CHECK_COMMAND`/`TEST_COMMAND` constants for the editor)
+  rather than the `search_files`/`read_file` primitives or the patch tool
+  directly, so raw file text stays out of the main conversation.
 - `test/` — Minitest suite for the generator CLI.
 - `docs/` — vision and design notes. Design decisions get written down here.
 
