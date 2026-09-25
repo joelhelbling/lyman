@@ -85,6 +85,25 @@ module Lyman
           wire: "Lyman::Tools.read_file(root: Dir.pwd)",
           description: "Tool: read a file (optionally by line range) with line numbers, root-confined"
         },
+        # The patch tool (docs/design/tools-and-agents.md, "Patching"): one
+        # file, two factories — search_replace (the default format) and
+        # apply_diff — sharing the check step, so one artifact. Stdlib
+        # only, so planted by default like the file primitives. `wire:`
+        # names the default format with a Ruby project's check; `advice:`
+        # names the other format, since wiring is choosing one. (The
+        # not-wired heuristic matches `wire:`'s factory, so a harness that
+        # wires apply_diff still gets the reminder — harmless, and the
+        # advice says why.)
+        "patch_tool" => {
+          source: "lib/lyman/tools/patch.rb",
+          dest: "lib/lyman/tools/patch.rb",
+          role: :managed,
+          wire: "Lyman::Tools.search_replace(root: Dir.pwd, check: \"bundle exec standardrb\")",
+          advice: "Two formats, one per factory: Lyman::Tools.search_replace (search-and-replace " \
+            "blocks, the default) or Lyman::Tools.apply_diff (unified diff) — list the one your model " \
+            "writes well. check: takes a command (the touched path is appended), a callable, or nil.",
+          description: "Tool: patch one file (search/replace or unified diff), then run a check on it, root-confined"
+        },
         # optional: true because it needs a store, which a fresh scaffold
         # doesn't have — reach it with `lyman add recall_tool` once `store`
         # is planted (or wire it to a hand-rolled duck-typed store).

@@ -291,6 +291,29 @@ class AddTest < Minitest::Test
     end
   end
 
+  # Nothing wires the patch tool yet (the file editor agent will), so
+  # re-adding it advises the wiring line — and names both formats, since
+  # wiring it means choosing one.
+  def test_add_patch_tool_advises_wiring_and_names_both_formats
+    in_tmpdir do
+      scaffold_project("demo")
+      Dir.chdir("demo") do
+        manifest = Lyman::CLI::Manifest.load(Dir.pwd)
+        manifest.delete_artifact("patch_tool")
+        manifest.save
+        FileUtils.rm_f("lib/lyman/tools/patch.rb")
+
+        result = run_cli("add", "patch_tool")
+
+        assert_equal 0, result.status
+        assert File.exist?("lib/lyman/tools/patch.rb")
+        assert_includes result.out, "not wired"
+        assert_includes result.out, "Lyman::Tools.search_replace"
+        assert_includes result.out, "Lyman::Tools.apply_diff"
+      end
+    end
+  end
+
   def test_add_read_file_tool_gives_no_wiring_advice_when_a_harness_mentions_it
     in_tmpdir do
       scaffold_project("demo")
