@@ -136,7 +136,7 @@ module FileReader
     return nil unless matches.size == 1
 
     reader = Lyman::Tools.read_file(root: root, max_chars: Float::INFINITY)
-    reader[:handler].call({"path" => path})
+    reader[:handler].call({"path" => matches.first}) # the match, not the glob
   end
 
   # The script archetype, built fresh per call: a fresh Conversation, a
@@ -176,12 +176,13 @@ module FileReader
     # Tool calls still pending means the round counter cut the circuit off
     # mid-work (runaway? alone can't tell — it's also true when the answer
     # arrived on the last allowed round).
-    answer = result.last_assistant_content.to_s.strip
-    if result.pending_tool_calls.any? || answer.empty?
+    if result.pending_tool_calls.any?
       return "file_reader stopped after #{max_rounds} rounds without an answer — " \
         "try a narrower path or a more specific query."
     end
-    answer
+
+    answer = result.last_assistant_content.to_s.strip
+    answer.empty? ? "file_reader finished without an answer — try rephrasing the query." : answer
   end
 
   def self.presence(value)

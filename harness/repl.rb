@@ -45,7 +45,9 @@ tool_printer = ToolPrinter.new
 # `lyman add <name>_tool` plants more; list them here to hand them to the model.
 # The main model asks, the sub-agent reads: search_files/read_file are the
 # reader's tools, not the main model's, so raw file text never enters the
-# main context — only file_reader's concise reply does.
+# main context — only file_reader's concise reply does. Want the model to
+# read files directly too? List the read_file and search_files tools here
+# (their wiring lines are in harness/agents/file_reader.rb).
 TOOLS = [
   Lyman::Tools.current_time,
   file_reader(
