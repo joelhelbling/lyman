@@ -248,6 +248,69 @@ class AddTest < Minitest::Test
     end
   end
 
+  # A commented-out wiring line is exactly when the reminder matters, so
+  # whole-line comments don't count as wiring (issue #27).
+  def test_add_current_time_tool_advises_wiring_when_a_harness_only_mentions_it_in_a_comment
+    in_tmpdir do
+      scaffold_project("demo")
+      Dir.chdir("demo") do
+        manifest = Lyman::CLI::Manifest.load(Dir.pwd)
+        manifest.delete_artifact("current_time_tool")
+        manifest.save
+        FileUtils.rm_f("lib/lyman/tools/current_time.rb")
+        contents = File.read("harness/repl.rb").gsub("  Lyman::Tools.current_time,", "  # Lyman::Tools.current_time,")
+        File.write("harness/repl.rb", contents)
+        assert_includes contents, "# Lyman::Tools.current_time,"
+
+        result = run_cli("add", "current_time_tool")
+
+        assert_equal 0, result.status
+        assert_includes result.out, "not wired"
+      end
+    end
+  end
+
+  # An agent file defines and documents its own factory, and a root harness
+  # require_relative's it by path; neither is the agent being wired into
+  # TOOLS, so neither suppresses the reminder.
+  def test_add_file_editor_agent_advises_wiring_when_the_repl_only_requires_it
+    in_tmpdir do
+      scaffold_project("demo")
+      Dir.chdir("demo") do
+        manifest = Lyman::CLI::Manifest.load(Dir.pwd)
+        manifest.delete_artifact("file_editor_agent")
+        manifest.save
+        FileUtils.rm_f("harness/agents/file_editor.rb")
+        contents = File.read("harness/repl.rb").gsub("  file_editor(", "  # file_editor(")
+        File.write("harness/repl.rb", contents)
+        assert_includes contents, 'require_relative "agents/file_editor"'
+
+        result = run_cli("add", "file_editor_agent")
+
+        assert_equal 0, result.status
+        assert File.exist?("harness/agents/file_editor.rb")
+        assert_includes result.out, "not wired"
+      end
+    end
+  end
+
+  def test_add_file_editor_agent_gives_no_wiring_advice_when_the_repl_wires_it
+    in_tmpdir do
+      scaffold_project("demo")
+      Dir.chdir("demo") do
+        manifest = Lyman::CLI::Manifest.load(Dir.pwd)
+        manifest.delete_artifact("file_editor_agent")
+        manifest.save
+        FileUtils.rm_f("harness/agents/file_editor.rb")
+
+        result = run_cli("add", "file_editor_agent")
+
+        assert_equal 0, result.status
+        refute_includes result.out, "not wired"
+      end
+    end
+  end
+
   # search_files and read_file are wired inside harness/agents/file_reader.rb
   # and harness/agents/file_editor.rb (the agents' own tools), not directly
   # in harness/repl.rb, so these tests exercise those files rather than the

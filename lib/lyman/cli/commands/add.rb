@@ -75,7 +75,7 @@ module Lyman
         def advise_on_wiring(name, spec, project_root)
           wire = spec[:wire]
           return unless wire
-          return if any_harness_mentions?(project_root, wire)
+          return if any_harness_mentions?(project_root, wire, except: spec[:dest])
           @thor.say "#{name} is planted but not wired: add #{wire} to a harness's TOOLS array " \
             "to hand it to the model (harnesses are yours, so lyman doesn't edit them)."
         end
@@ -83,11 +83,23 @@ module Lyman
         # A heuristic, since the advice is only a reminder: match the factory
         # call by name, ignoring its arguments (a harness may pass its own
         # variable where `wire:` says `store: store`), and stop at a word
-        # boundary so current_time_range doesn't count as current_time.
-        def any_harness_mentions?(project_root, wire)
-          call = /#{Regexp.escape(wire.sub(/\(.*\z/m, ""))}\b/
+        # boundary so current_time_range doesn't count as current_time. Nor
+        # may it follow a word character or a slash, so my_file_reader and
+        # require_relative "agents/file_reader" aren't calls to file_reader.
+        # Whole-line comments are ignored — harnesses are owned and heavily
+        # commented, and a commented-out wiring line is exactly the case the
+        # reminder is for. Trailing comments and =begin/=end blocks still
+        # count: handling those properly means parsing Ruby, too heavy for a
+        # reminder. The artifact's own file is skipped too, since an agent
+        # file defines (and documents) the very factory its `wire:` names —
+        # a file never wires itself.
+        def any_harness_mentions?(project_root, wire, except: nil)
+          call = %r{(?<![\w/])#{Regexp.escape(wire.sub(/\(.*\z/m, ""))}\b}
+          own = File.join(project_root, except) if except
           Dir.glob(File.join(project_root, "harness", "**", "*.rb")).any? do |path|
-            call.match?(File.read(path))
+            next false if path == own
+            code = File.read(path).lines.reject { |line| line.lstrip.start_with?("#") }.join
+            call.match?(code)
           end
         end
 
