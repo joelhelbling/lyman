@@ -340,6 +340,52 @@ class PatchTest < Minitest::Test
     end
   end
 
+  def test_out_of_order_hunks_are_named_as_such
+    with_tree("a.rb" => "a\nb\nc\nd\n") do |root|
+      diff = "@@ -3,1 +3,1 @@\n-c\n+C\n@@ -1,1 +1,1 @@\n-a\n+A\n"
+
+      result = apply_diff(root, "path" => "a.rb", "diff" => diff)
+
+      assert_includes result, "Hunk 2 of 2 did not apply"
+      assert_includes result, "file order"
+      assert_equal "a\nb\nc\nd\n", File.read(File.join(root, "a.rb"))
+    end
+  end
+
+  def test_a_git_style_multi_file_diff_is_refused_as_multi_file
+    with_tree("a.rb" => "a\n", "b.rb" => "b\n") do |root|
+      diff = "diff --git a/a.rb b/a.rb\n--- a/a.rb\n+++ b/a.rb\n@@ -1 +1 @@\n-a\n+A\n" \
+        "diff --git a/b.rb b/b.rb\n--- a/b.rb\n+++ b/b.rb\n@@ -1 +1 @@\n-b\n+B\n"
+
+      result = apply_diff(root, "path" => "a.rb", "diff" => diff)
+
+      assert_includes result, "more than one file"
+      assert_equal "a\n", File.read(File.join(root, "a.rb"))
+    end
+  end
+
+  # "---- x" removes the line "--- x"; "++++ y" adds "+++ y". With no @@
+  # after them they're hunk content, not a second file's headers.
+  def test_header_lookalike_content_lines_are_content
+    with_tree("a.md" => "top\n--- x\n") do |root|
+      diff = "@@ -1,2 +1,2 @@\n top\n---- x\n++++ y\n"
+
+      apply_diff(root, "path" => "a.md", "diff" => diff)
+
+      assert_equal "top\n+++ y\n", File.read(File.join(root, "a.md"))
+    end
+  end
+
+  def test_creating_a_file_honors_no_newline_at_end_of_file
+    with_tree({}) do |root|
+      diff = "@@ -0,0 +1,2 @@\n+one\n+two\n\\ No newline at end of file\n"
+
+      apply_diff(root, "path" => "new.txt", "diff" => diff)
+
+      assert_equal "one\ntwo", File.read(File.join(root, "new.txt"))
+    end
+  end
+
   def test_a_diff_without_hunks_says_so
     with_tree("a.rb" => "a\n") do |root|
       assert_includes apply_diff(root, "path" => "a.rb", "diff" => "just some words"), "No hunks found"

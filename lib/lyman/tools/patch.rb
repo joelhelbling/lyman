@@ -285,7 +285,9 @@ module Lyman
 
       module UnifiedDiff
         HUNK_HEADER = /\A@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/
-        Hunk = Struct.new(:old_start, :lines) do
+        # no_newline: a "\ No newline at end of file" marker followed this
+        # hunk's new side — only consulted when the diff creates a file.
+        Hunk = Struct.new(:old_start, :lines, :no_newline) do
           def old_lines = lines.filter_map { |kind, text| text unless kind == "+" }
           def new_lines = lines.filter_map { |kind, text| text unless kind == "-" }
         end
@@ -349,14 +351,21 @@ module Lyman
 
         # File headers (---/+++, diff, index) are ignored: `path` decides
         # the file. A second file header after the first hunk means the
-        # model sent a multi-file diff, which this tool refuses.
+        # model sent a multi-file diff, which this tool refuses. A ---/+++
+        # pair only counts as a header when a hunk follows it, so a removed
+        # "-- x" line next to an added "++ y" line stays content.
         def self.parse(diff)
           hunks = []
           rows = diff.split("\n", -1)
           rows.pop if rows.last == ""
+          multi_file = "This diff touches more than one file; send one file per call. Nothing was changed."
           rows.each_with_index do |row, i|
-            if row.start_with?("--- ") && rows[i + 1]&.start_with?("+++ ")
-              return "This diff touches more than one file; send one file per call. Nothing was changed." if hunks.any?
+            if row.start_with?("diff --git ")
+              return multi_file if hunks.any?
+              next
+            end
+            if row.start_with?("--- ") && rows[i + 1]&.start_with?("+++ ") && rows[i + 2]&.start_with?("@@")
+              return multi_file if hunks.any?
               next
             end
             if row.start_with?("@@")
@@ -368,7 +377,8 @@ module Lyman
             case row[0]
             when " ", "-", "+" then hunks.last.lines << [row[0], row[1..]]
             when nil then hunks.last.lines << [" ", ""] # a blank context line whose space was trimmed
-            when "\\" then next # "\ No newline at end of file"
+            when "\\" # "\ No newline at end of file" — after a - line it's about the old side
+              hunks.last.no_newline = true unless hunks.last.lines.last&.first == "-"
             else
               return "Unrecognized line in hunk #{hunks.size}: #{row.inspect} — hunk lines start with " \
                 "space, - or +. Nothing was changed."
@@ -396,13 +406,18 @@ module Lyman
             return :ambiguous unless expected
             return starts.min_by { |i| (i - expected).abs }
           end
-          :not_found
+          # Present, but above a hunk already applied: the model sent its
+          # hunks out of file order, which is worth saying precisely.
+          want = old.map(&:rstrip)
+          behind = (0...[floor, lines.size - old.size + 1].min).any? { |i| lines[i, old.size].map(&:rstrip) == want }
+          behind ? :out_of_order : :not_found
         end
 
         def self.failed_hunk(n, total, hunk, path, why)
           reason = case why
           when :no_anchor then "it only adds lines and has no @@ line number to place them by"
           when :ambiguous then "its context matches several places and its @@ header has no line number"
+          when :out_of_order then "its lines are above an earlier hunk — hunks must appear in file order"
           else "its context and - lines were not found in #{path}"
           end
           "Hunk #{n + 1} of #{total} did not apply: #{reason}. Nothing was changed. " \
@@ -413,7 +428,8 @@ module Lyman
           if hunks.any? { |h| h.old_lines.any? }
             return "No such file: #{path} (to create a file, send hunks with only + lines)."
           end
-          content = hunks.flat_map(&:new_lines).join("\n") + "\n"
+          content = hunks.flat_map(&:new_lines).join("\n")
+          content += "\n" unless hunks.last.no_newline
           failure = Patch.write_text(abs, content, crlf: false)
           return failure if failure
           Patch.report("Created #{path} (#{content.lines.size} lines).", abs, checker: checker)
