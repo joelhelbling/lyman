@@ -112,6 +112,19 @@ class NewTest < Minitest::Test
     end
   end
 
+  # Same guarantee for its write-side twin, which the repl also requires.
+  def test_planted_file_editor_agent_loads_and_exposes_its_schema
+    in_tmpdir do
+      project = scaffold_project
+      script = 'require "./harness/agents/file_editor"; ' \
+        'tool = file_editor(root: Dir.pwd, default_model: "m", default_base_url: "http://example.invalid"); ' \
+        'print tool[:schema].dig("function", "name")'
+      out = IO.popen([RbConfig.ruby, "-e", script], chdir: project, &:read)
+
+      assert_equal "file_editor", out
+    end
+  end
+
   # Guards against a harness referencing a tool `new` never plants: every
   # Lyman::Tools.<x> this repo's own harnesses list must have a matching
   # registry artifact (by `wire:`) that isn't optional.

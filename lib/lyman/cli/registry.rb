@@ -160,6 +160,23 @@ module Lyman
             "file_reader(root: Dir.pwd, default_model: MODEL, default_base_url: BASE_URL) in TOOLS.",
           description: "Agent-as-tool: a sub-agent that reads files so raw file text never enters the main context"
         },
+        # The file reader's write-side twin, same posture: owned (its prompt,
+        # tools, model and patch format are the editing strategy) and
+        # planted by `new`, since harness/repl.rb requires it. Its check:
+        # and test: default to a Ruby project's commands; `advice:` says so,
+        # since a client project may lint and test some other way.
+        "file_editor_agent" => {
+          source: "harness/agents/file_editor.rb",
+          dest: "harness/agents/file_editor.rb",
+          role: :owned,
+          needs: ["search_files_tool", "read_file_tool", "patch_tool"],
+          wire: "file_editor(root: Dir.pwd, default_model: MODEL, default_base_url: BASE_URL)",
+          advice: "Wire it into a harness: require_relative \"agents/file_editor\", then list " \
+            "file_editor(root: Dir.pwd, default_model: MODEL, default_base_url: BASE_URL) in TOOLS. " \
+            "check: and test: default to \"bundle exec standardrb\" and \"bundle exec rake test\" — " \
+            "pass your project's own commands, or nil to skip either.",
+          description: "Agent-as-tool: a sub-agent that makes a described change, checks it, then runs the tests out of its reach"
+        },
         "repl_harness" => {
           source: "harness/repl.rb",
           dest: "harness/repl.rb",
