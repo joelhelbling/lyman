@@ -30,6 +30,9 @@ source of truth for intent; this file is a summary plus working conventions.
   `ruby harness/script.rb "some task"` and `ruby harness/daemon.rb` (answers
   line-per-event on TCP port 1216; try `echo hi | nc localhost 1216`) exercise
   the other two archetypes against the same endpoint.
+  `ruby harness/agents/file_reader.rb PATH [QUERY] [SHAPE]` runs the file
+  reader agent standalone (answer on stdout, inner tool activity on stderr) —
+  the same file the repl calls as a tool.
 - `bundle exec exe/lyman` — the generator CLI (`new` / `add` / `update` /
   `eject` / `diff` / `doctor` / `list`). `LYMAN_SOURCE_ROOT` points it at an
   alternate artifact-source tree — how tests simulate a newer lyman release.
@@ -94,7 +97,14 @@ source of truth for intent; this file is a summary plus working conventions.
   holds. `harness/compactor.rb` is not a fourth archetype: it's a
   daemon-archetype shell (`run_compactor`) that a root harness runs in a
   thread — owned and opt-in (`lyman add compactor`), since its digest
-  instructions and model are the compaction strategy.
+  instructions and model are the compaction strategy. `harness/agents/`
+  holds agent-as-tool files the same way: a script-archetype shell run
+  inside a tool handler rather than a fourth archetype — owned, one file
+  per agent, its own tool set declared inside it. `file_reader.rb`
+  (registry `file_reader_agent`) is the first, planted by `new`; the repl
+  hands the model `file_reader` in `TOOLS` rather than the `search_files`/
+  `read_file` primitives directly, so raw file text stays out of the main
+  conversation.
 - `test/` — Minitest suite for the generator CLI.
 - `docs/` — vision and design notes. Design decisions get written down here.
 

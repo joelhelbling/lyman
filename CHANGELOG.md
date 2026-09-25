@@ -4,6 +4,33 @@
 
 ### Added
 
+- **Agent-as-tool, and the file reader agent** (`harness/agents/file_reader.rb`,
+  planted by `lyman new`, registry `file_reader_agent`): an agent-as-tool is
+  the script archetype run inside a tool handler — the work item arrives
+  with the tool call (its args play `ARGV`), and the return value plays
+  stdout, the same relationship `harness/compactor.rb` has to the daemon
+  archetype. It's an owned Ruby file, not a markdown/YAML agent
+  definition: a top-level factory returning `{schema:, handler:}`, its own
+  tool set declared explicitly inside the file, a fresh conversation and
+  `rounds` queue built per call, its own `max_rounds` runaway guard, an
+  optional `trace:` callable for nested display/logging/persistence (`nil`
+  by default, silent), and `model:`/`default_model:` (plus
+  `base_url:`/`default_base_url:`) so a harness can hand down its own model
+  choice. Runnable standalone
+  (`ruby harness/agents/file_reader.rb PATH [QUERY] [SHAPE]`, answer on
+  stdout, inner tool activity on stderr) for tuning its prompt and model
+  directly. The file reader takes `path` (file or glob), an optional
+  `query`, and `shape` (`excerpts` default, `outline`, or `answer`) — the
+  caller names the shape, so the agent never switches on file type. Its
+  handler shortcuts the model entirely when there's no query and the
+  path/glob resolves to exactly one file; any query, or several matched
+  files, delegates. Its tools are `search_files`/`read_file` (needs
+  `search_files_tool`/`read_file_tool`). `harness/repl.rb` now lists
+  `file_reader` in `TOOLS` instead of the raw primitives, so file text
+  never enters the main conversation, and shows its nested tool activity
+  indented under the call (`ToolPrinter` gained `indent:`). Closes parts 2
+  and 4 of the tools-and-agents design (issues #14, #16) — shipped
+  together since a toy agent would have proven nothing about the pattern.
 - **File primitives** (`Lyman::Tools.search_files(root:, max_hits: 100)`,
   `Lyman::Tools.read_file(root:, max_chars: 20_000)`): plain handlers, no
   model, stdlib only, planted by `lyman new` alongside `current_time`.
