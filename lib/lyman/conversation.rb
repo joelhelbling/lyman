@@ -165,7 +165,15 @@ module Lyman
         end
       end
 
-      result
+      # A reply with neither text nor tool calls (a model can end a turn
+      # that way) keeps its nil in the series, but goes out as "": Ollama
+      # rejects "content": null on it, failing every later request in the
+      # conversation. Checked after the loop because tool calls are only
+      # folded onto their assistant message as they follow it; a
+      # tool-calling message keeps the standard null.
+      result.each do |message|
+        message["content"] = "" if message["role"] == "assistant" && message["content"].nil? && !message.key?("tool_calls")
+      end
     end
 
     # The conversation keeps each element's reasoning (it's useful to
