@@ -159,6 +159,22 @@ class ConversationTest < Minitest::Test
     convo.wire_messages.each { |m| refute m.key?("reasoning") }
   end
 
+  # Seen live: a model ending a turn with neither text nor tool calls.
+  # Ollama rejects "content": null on such a message (400 "invalid message
+  # content type: <nil>"), which fails every later request in the
+  # conversation — so the projection sends "" while the element keeps nil.
+  def test_empty_reply_projects_as_empty_string_content
+    convo = Lyman::Conversation.new(system_prompt: "system prompt")
+      .with_user_message("hi")
+      .with_assistant_message({"role" => "assistant", "content" => nil})
+      .with_user_message("still there?")
+
+    reply = convo.wire_messages.find { |m| m["role"] == "assistant" }
+    assert_equal({"role" => "assistant", "content" => ""}, reply)
+    assert_equal reply, convo.messages.find { |m| m["role"] == "assistant" }
+    assert_nil convo.element(3).content["text"]
+  end
+
   def test_pending_tool_calls_before_and_after_results
     convo = Lyman::Conversation.new.with_assistant_message({
       "role" => "assistant",

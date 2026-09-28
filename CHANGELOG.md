@@ -131,6 +131,15 @@
   `require_relative`s it, no longer counts as the agent being wired.
   Trailing comments and `=begin`/`=end` blocks still count; handling them
   would mean parsing Ruby.
+- **An empty model reply no longer breaks the rest of the conversation
+  on Ollama.** A model can end a turn with neither text nor tool calls.
+  That reply went out on every later request as `"content": null`, which
+  Ollama rejects (`400 invalid message content type: <nil>`), so every
+  request after it failed, and resuming from the store didn't help.
+  `Conversation#messages` (and so `#wire_messages`) now projects such a
+  reply as `"content": ""`. The element keeps its `nil` in the series and
+  the store, and a message that carries tool calls keeps the standard
+  `null`. LM Studio accepted the `null`, which hid the bug there.
 
 ## 0.3.0
 
