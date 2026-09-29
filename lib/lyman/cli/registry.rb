@@ -38,6 +38,14 @@ module Lyman
           role: :managed,
           description: "Wire-time abridgement policies: deterministic context reduction, no model needed"
         },
+        # Stdlib only (net/http), and harness/repl.rb asks it for the
+        # context window, so planted unconditionally.
+        "providers" => {
+          source: "lib/lyman/providers.rb",
+          dest: "lib/lyman/providers.rb",
+          role: :managed,
+          description: "Per-server facts beyond the OpenAI surface (context window): Ollama, LM Studio, generic"
+        },
         # The compaction vocabulary and its feed: stdlib only, so planted
         # unconditionally, like abridgement. The sidecar that uses them
         # (compactor, below) is the opt-in part.
@@ -244,6 +252,12 @@ module Lyman
           dest: "harness/repl/tool_printer.rb",
           role: :owned,
           description: "Prints tool calls on the way in, summarized results on the way out"
+        },
+        "context_meter" => {
+          source: "harness/repl/context_meter.rb",
+          dest: "harness/repl/context_meter.rb",
+          role: :owned,
+          description: "Prints \"ctx: 2.4k/131k\" above the prompt: last usage over the provider's context window"
         },
         "claude_md" => {
           source: "templates/CLAUDE.md",

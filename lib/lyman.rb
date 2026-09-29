@@ -2,6 +2,7 @@ require "shifty"
 
 require_relative "lyman/conversation"
 require_relative "lyman/abridgement"
+require_relative "lyman/providers"
 require_relative "lyman/compaction"
 require_relative "lyman/workers/chat_completion"
 require_relative "lyman/workers/tool_execution"

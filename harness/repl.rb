@@ -24,6 +24,7 @@ require_relative "../lib/lyman"
 require_relative "repl/style"
 require_relative "repl/round_printer"
 require_relative "repl/tool_printer"
+require_relative "repl/context_meter"
 require_relative "agents/file_reader"
 require_relative "agents/file_editor"
 require "cli/ui"
@@ -37,6 +38,11 @@ $stdout.sync = true
 
 BASE_URL = ENV.fetch("LYMAN_BASE_URL", "http://localhost:11434/v1")
 MODEL = ENV.fetch("LYMAN_MODEL", "gemma4:latest")
+
+# What the server knows beyond the OpenAI-compatible surface (the loaded
+# context window, for one). detect probes BASE_URL's native API; if you
+# know your server, name it instead: Lyman::Providers::LMStudio.new(base_url: BASE_URL).
+PROVIDER = Lyman::Providers.detect(BASE_URL)
 
 # The file editor's lint and test commands. Settings live here, in the
 # harness, and are handed in as factory arguments — edit them for your
@@ -80,6 +86,7 @@ conversation = Lyman::Conversation.new(
 )
 rounds = [] # the circuit's queue — visible right here, not smuggled
 printer = RoundPrinter.new(MODEL)
+context_meter = ContextMeter.new(PROVIDER, MODEL)
 
 # ── Context policy: what each round shows the model ─────────────────────────
 # The conversation keeps every element; this only shapes the wire projection.
@@ -105,7 +112,7 @@ pipeline =
   filter_worker { |c| c.finished? }
 
 # ── Shell process ───────────────────────────────────────────────────────────
-puts CLI::UI.fmt("{{bold:lyman}} ⇢ {{magenta:#{MODEL}}} @ {{blue:#{BASE_URL}}}")
+puts CLI::UI.fmt("{{bold:lyman}} ⇢ {{magenta:#{MODEL}}} @ {{blue:#{BASE_URL}}} ({{blue:#{PROVIDER.name}}})")
 puts
 puts gray(<<~HINTS.gsub(/^/, "  "))
   exit:                 blank line, ctrl-c, or ctrl-d
@@ -114,8 +121,18 @@ puts gray(<<~HINTS.gsub(/^/, "  "))
   available tools:      #{handlers.keys.join(", ")} — a ⚙ line appears when the model calls one
 HINTS
 
+# Load the model now rather than on the first prompt: the server settles
+# its context window at load time, so the meter can show it from the
+# start. Delete these lines to load lazily (the meter reads "?" until
+# the first reply).
+spinner = WaitSpinner.new
+spinner.start("loading #{MODEL}…")
+PROVIDER.preload(MODEL)
+spinner.stop
+
 loop do
   puts
+  puts gray(context_meter.line(conversation))
   # Reline gives the prompt line editing and history, but emits screen-
   # redraw escapes even when input is piped — so scripted runs get gets.
   input = begin
