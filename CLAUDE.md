@@ -53,7 +53,12 @@ source of truth for intent; this file is a summary plus working conventions.
   through pipelines), `Element` (the typed, addressable units stored in a
   conversation), `Store` (`store.rb` — the only file that requires the
   `sqlite3` gem; persists conversations with lineage and a full-text
-  index), `Abridgement` (`abridgement.rb` — deterministic, model-free
+  index), `Providers` (`providers.rb` — one class per model server, Ollama /
+  LM Studio / generic OpenAI-compatible, each answering `name`,
+  `preload(model)` and `context_window(model)` from the server's native API, with
+  `Providers.detect(base_url)` to pick one by probing; managed, stdlib
+  only, planted by `new` — see `docs/design/providers.md`),
+  `Abridgement` (`abridgement.rb` — deterministic, model-free
   wire-time projection policies: `SuppressPriorReasoning`,
   `StubToolResults`, `chain`, `over_budget`), `Workers` (factories like
   `chat_completion`, `tool_execution`, and `store_append`, the
@@ -93,7 +98,8 @@ source of truth for intent; this file is a summary plus working conventions.
   `docs/design/harness-archetypes.md`. Each is a deliberately top-level Ruby
   wiring script, not a class, owned by the user from day one (`lyman new`
   plants the repl; the other two are opt-in via `lyman add`). The repl's
-  display layer (styling, think-preview filter, spinner, printers) lives in
+  display layer (styling, think-preview filter, spinner, printers, the
+  `ctx: used/window` context meter) lives in
   `harness/repl/`, one file per widget, each registered as its own owned
   artifact; the daemon and script stay stdlib-only. Harnesses load local
   files with `require_relative` — they use the files in `lib/`, not the

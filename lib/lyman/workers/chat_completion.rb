@@ -36,7 +36,8 @@ module Lyman
     # consult on the next round. See docs/design/context-control.md
     # ("Two kinds of reduction, kept apart").
     #
-    # This is the only part of lyman that knows HTTP exists.
+    # This is the only part of lyman that speaks the chat wire format;
+    # facts outside it (like the context window) are Lyman::Providers'.
     def self.chat_completion(base_url:, model:, tools: nil, read_timeout: 300, on_delta: nil, abridgement: nil, send_reasoning: false)
       uri = URI("#{base_url.chomp("/")}/chat/completions")
 

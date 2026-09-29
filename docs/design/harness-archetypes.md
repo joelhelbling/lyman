@@ -66,8 +66,9 @@ into the circuit and rebinding to the finished turn that comes back
 [immutable-conversation.md](immutable-conversation.md)).
 
 The repl is also where a display layer earns its keep — a human is watching,
-so the harness streams tokens, previews `<think>` blocks, and shows tool
-calls as they happen. All of that lives in `harness/repl/` (one widget per
+so the harness streams tokens, previews `<think>` blocks, shows tool
+calls as they happen, and meters the context window above each prompt
+(see [providers.md](providers.md)). All of that lives in `harness/repl/` (one widget per
 file, each an owned artifact), and its dependencies (cli-ui, reline) are
 confined there: delete the display layer and the circuit doesn't notice.
 

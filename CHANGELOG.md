@@ -4,6 +4,29 @@
 
 ### Added
 
+- **Context meter in the repl**: a gray `ctx: 2.4k/131k` line above each
+  `you>` prompt — the last reply's `total_tokens` (falling back to prompt +
+  completion) over the model's loaded context window, `?` for either side
+  when unknown. The window comes from new **`Lyman::Providers`**
+  (`lib/lyman/providers.rb`, registry `providers`, managed, stdlib only,
+  planted by `lyman new`): one class per server — `Ollama` (`/api/ps`
+  `context_length`), `LMStudio` (`/api/v0/models` `loaded_context_length`),
+  and the `OpenAICompatible` fallback (always `nil`) — each answering
+  `name`, `preload(model)` and `context_window(model)`, never raising.
+  Servers settle the window at load time (an LM Studio model with a 64k
+  maximum may load at 8k), so the repl calls `PROVIDER.preload(MODEL)`
+  under a spinner at startup, and the first prompt already reads
+  `ctx: 0/131k`. Ollama's preload is an empty-prompt `/api/generate`;
+  LM Studio's is `/api/v1/models/load`, skipped when already loaded (a
+  second load would start a second instance). The meter reads `0` before
+  any reply and keeps the last known window if the server unloads the
+  model while idle.
+  `Providers.detect(base_url)` probes native endpoints to pick one; name a
+  class directly to skip the probes. The widget is
+  `harness/repl/context_meter.rb` (registry `context_meter`, owned);
+  `harness/repl.rb` sets `PROVIDER = Lyman::Providers.detect(BASE_URL)` and
+  shows the provider name in its banner. See `docs/design/providers.md`.
+
 - **File editor agent** (`harness/agents/file_editor.rb`, planted by
   `lyman new`, registry `file_editor_agent`, needs `search_files_tool`,
   `read_file_tool`, `patch_tool`): the file reader's write-side twin. One
