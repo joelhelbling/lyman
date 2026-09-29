@@ -42,6 +42,9 @@ MODEL = ENV.fetch("LYMAN_MODEL", "gemma4:latest")
 # What the server knows beyond the OpenAI-compatible surface (the loaded
 # context window, for one). detect probes BASE_URL's native API; if you
 # know your server, name it instead: Lyman::Providers::LMStudio.new(base_url: BASE_URL).
+# The probes run before the banner prints: instant when nothing listens,
+# but an endpoint that drops packets costs up to a second per provider
+# class. Naming the class skips them.
 PROVIDER = Lyman::Providers.detect(BASE_URL)
 
 # The file editor's lint and test commands. Settings live here, in the
