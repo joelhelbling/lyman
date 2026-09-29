@@ -257,6 +257,7 @@ module Lyman
           source: "harness/repl/context_meter.rb",
           dest: "harness/repl/context_meter.rb",
           role: :owned,
+          needs: ["providers"],
           description: "Prints \"ctx: 2.4k/131k\" above the prompt: last usage over the provider's context window"
         },
         "claude_md" => {
