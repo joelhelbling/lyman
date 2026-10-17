@@ -54,6 +54,14 @@ Consequences:
   `Array#rindex` (used in `pending_tool_calls`) works everywhere; `rfind`
   does not. Where a floor-safe spelling is less obvious, say why in a comment
   — `last_assistant_content` carries one.
+- **The lockfile is part of the promise.** A lock generated on 4.0 can pin a
+  gem that refuses to install at the floor: `parallel 2.1.0` (a
+  `rubocop-performance` dependency) requires Ruby ≥ 3.3, and bundler 4
+  reports that rather than quietly re-resolving, so CI's 3.2 job could not
+  build the bundle at all. The Gemfile caps `parallel` at `< 2` so one lock
+  resolves across the whole matrix. When a dev dependency raises its own
+  floor, the cap goes in the Gemfile with a comment saying why — not in a
+  per-version CI workaround.
 - **Bump the floor deliberately, in one commit.** If a dependency ever forces
   it, the gemspec, `README.md`, `wiki/Getting-Started.md`, `templates/`, and
   the CI matrix all move together — the failure mode this note exists to
