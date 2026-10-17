@@ -145,6 +145,18 @@
 
 ### Fixed
 
+- **The declared Ruby floor works.** `Conversation#last_assistant_content`
+  used `Array#rfind`, added in Ruby 4.0 (Feature #21678), while the gemspec
+  and the wiki promised ≥ 3.2: on 3.2–3.4 every artifact that reads a final
+  answer raised `NoMethodError` — the script and daemon harnesses, both
+  agent-as-tool files, and the compactor's digest (which degraded to
+  recording a gap). It uses `elements.rindex` now, the spelling
+  `pending_tool_calls` already used; nothing else in the inventory needed
+  4.0 (`Data.define` is the newest feature, and it landed in 3.2). The claim
+  was unenforceable because nothing ran it on the floor: CI
+  (`.github/workflows/ci.yml`) now runs lint and the suite on 3.2, 3.3, 3.4,
+  and 4.0. See `docs/design/ruby-version-policy.md` (issue #37).
+
 - **`lyman add`'s "planted but not wired" advice no longer goes quiet on
   mere mentions.** The check ignores whole-line comments, so a
   commented-out wiring line (`# Lyman::Tools.recall(store: store)`) now

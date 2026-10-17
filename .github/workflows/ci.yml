@@ -1,0 +1,48 @@
+# The gemspec's required_ruby_version is a claim about every artifact lyman
+# plants, not just the CLI. A claim nothing runs is a claim that rots: the
+# floor said 3.2 while Conversation#last_assistant_content used Array#rfind
+# (Ruby 4.0 only), and 31 tests passed here on 4.0.5 while every 3.2–3.4 user
+# hit NoMethodError (issue #37). This matrix is what turns the floor back
+# into a promise — see docs/design/ruby-version-policy.md.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    name: Test (Ruby ${{ matrix.ruby }})
+    runs-on: ubuntu-latest
+    strategy:
+      # A floor violation shows up on the old Ruby only; failing fast on one
+      # version would hide which ones break and what else breaks with them.
+      fail-fast: false
+      matrix:
+        ruby: ["3.2", "3.3", "3.4", "4.0"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ matrix.ruby }}
+          bundler-cache: true
+
+      - name: Lint
+        run: bundle exec standardrb
+
+      # The suite never loads the repl harness or the standalone archetype
+      # scripts, so syntax a newer Ruby introduced could hide there. Parse
+      # every tracked file at this job's Ruby. (ruby -c with several files
+      # only checks the first, hence the loop.)
+      - name: Parse every Ruby file at this version
+        run: |
+          status=0
+          for f in $(git ls-files "*.rb"); do
+            ruby -c "$f" > /dev/null || { echo "::error::not parseable on Ruby ${{ matrix.ruby }}: $f"; status=1; }
+          done
+          exit $status
+
+      - name: Test
+        run: bundle exec rake test
