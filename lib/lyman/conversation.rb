@@ -211,9 +211,13 @@ module Lyman
       elements[(reply_start + 1)..].select { |e| e.type == "tool_call" }.map(&:content)
     end
 
+    # rindex + index rather than Array#rfind: rfind is Ruby 4.0 only
+    # (Feature #21678) and the gemspec floor is 3.2, so a 4.0-only method
+    # here silently breaks every artifact that reads a final answer on
+    # 3.2–3.4. See docs/design/ruby-version-policy.md.
     def last_assistant_content
-      element = elements.rfind { |e| e.type == "assistant" }
-      element && element.content["text"]
+      seq = elements.rindex { |e| e.type == "assistant" }
+      seq && elements[seq].content["text"]
     end
 
     def finish
