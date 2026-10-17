@@ -16,6 +16,8 @@ less margin for error than the frontier labs. Your one real edge is
 
 ![lyman new, then a first chat with a tool-using local model](demo/demo.gif)
 
+[![CI](https://github.com/joelhelbling/lyman/actions/workflows/ci.yml/badge.svg)](https://github.com/joelhelbling/lyman/actions/workflows/ci.yml)
+
 ## The idea
 
 An agent harness is a pipeline. Not as a metaphor — literally:
@@ -53,7 +55,10 @@ transparency isn't an aesthetic — it's what makes fast iteration possible.
 
 ## Quick start
 
-You'll need Ruby (see [`mise.toml`](mise.toml)) and a local model server
+You'll need **Ruby ≥ 3.2** (CI runs the suite on 3.2, 3.3, 3.4, and 4.0; this
+repo pins its own Ruby in [`mise.toml`](mise.toml), your project doesn't have
+to — see [`docs/design/ruby-version-policy.md`](docs/design/ruby-version-policy.md))
+and a local model server
 speaking the OpenAI-compatible API — [Ollama](https://ollama.com) and
 [LM Studio](https://lmstudio.ai) both work. Use a model with native tool
 support (e.g. `qwen3.5`, `gemma4`, `mistral`).

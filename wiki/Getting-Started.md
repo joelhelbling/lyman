@@ -5,8 +5,9 @@ tool-using agent answering you from a local model.
 
 ## Prerequisites
 
-- **Ruby** ≥ 3.2 (any recent Ruby works; the lyman repo itself pins its own
-  via [mise](https://mise.jdx.dev), but your project doesn't have to).
+- **Ruby** ≥ 3.2 (CI runs the suite on 3.2, 3.3, 3.4, and 4.0; the lyman repo
+  itself pins its own via [mise](https://mise.jdx.dev), but your project
+  doesn't have to).
 - **A local model server speaking the OpenAI-compatible API.**
   [Ollama](https://ollama.com) and [LM Studio](https://lmstudio.ai) both
   work out of the box. Pull a model with **native tool support** — e.g.
