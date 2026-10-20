@@ -7,6 +7,27 @@ module Lyman
   module Workers
     extend Shifty::DSL
 
+    # Every way this worker can fail to get a reply, in one class: the
+    # server isn't reachable, the request was refused, the response wasn't
+    # usable. A failed model call *should* raise — there's no honest value
+    # to hand downstream — but it has to raise a name a shell can catch and
+    # a user can grep for, not a socket error from inside someone else's
+    # framework. See docs/design/transport-failure.md.
+    class TransportError < StandardError; end
+
+    # The wire breaking, as opposed to a reply that's wrong: anything the
+    # socket layer can do to a request in flight.
+    NETWORK_FAILURES = [
+      Errno::ECONNREFUSED, Errno::ECONNRESET, Errno::EHOSTUNREACH, Errno::EHOSTDOWN,
+      Errno::ENETUNREACH, Errno::ENETDOWN, Errno::ETIMEDOUT, Errno::EPIPE,
+      SocketError, Net::OpenTimeout, Net::ReadTimeout, IOError, EOFError
+    ].freeze
+
+    # A non-2xx body is the server's own explanation (Ollama's 404 names the
+    # missing model), so it goes into the message — collapsed onto one line
+    # and capped, since a server error page can be a wall of HTML.
+    MAX_ERROR_BODY = 300
+
     # Relay worker: sends the conversation to an OpenAI-compatible chat
     # completions endpoint and hands off a new conversation with the
     # assistant's reply (which may include tool calls) appended.
@@ -38,6 +59,8 @@ module Lyman
     #
     # This is the only part of lyman that speaks the chat wire format;
     # facts outside it (like the context window) are Lyman::Providers'.
+    # Everything it raises is a TransportError: either a conversation with a
+    # reply appended comes back, or that does.
     def self.chat_completion(base_url:, model:, tools: nil, read_timeout: 300, on_delta: nil, abridgement: nil, send_reasoning: false)
       uri = URI("#{base_url.chomp("/")}/chat/completions")
 
@@ -60,14 +83,63 @@ module Lyman
         http.read_timeout = read_timeout
 
         message, usage =
-          if on_delta
-            stream_message(http, uri, payload, on_delta)
-          else
-            fetch_message(http, uri, payload)
+          with_transport(base_url: base_url, read_timeout: read_timeout) do
+            if on_delta
+              stream_message(http, uri, payload, on_delta)
+            else
+              fetch_message(http, uri, payload)
+            end
           end
 
         conversation.with_assistant_message(message).with_usage(usage)
       end
+    end
+
+    # One seam around the exchange: whatever the wire does, what leaves the
+    # worker is a TransportError, so a shell has exactly one class to catch.
+    # (TransportError itself is raised deeper in — by the non-2xx and
+    # no-message checks — and passes through unwrapped.)
+    def self.with_transport(base_url:, read_timeout:)
+      yield
+    rescue *NETWORK_FAILURES => e
+      raise TransportError, unreachable(base_url: base_url, read_timeout: read_timeout, error: e)
+    rescue JSON::ParserError => e
+      raise TransportError, "#{base_url} sent a response lyman couldn't parse (#{e.message})"
+    end
+
+    # The two states almost every first run is actually in: nothing
+    # listening, and a model that hasn't been pulled. Each message names
+    # the thing to check.
+    def self.unreachable(base_url:, read_timeout:, error:)
+      detail =
+        case error
+        when Net::ReadTimeout
+          # The timeout a slow server legitimately hits: a model loading for
+          # the first time can outlast the default.
+          "no response within read_timeout: #{read_timeout}s — a model still loading can take " \
+            "longer than that; pass a longer read_timeout: to chat_completion"
+        when Net::OpenTimeout
+          "no connection within the open timeout (#{error.message})"
+        when SocketError
+          "no such host (#{error.message})"
+        else
+          "#{error.message} — is your server running? (ollama serve, LM Studio, vLLM…)"
+        end
+
+      "can't reach #{base_url}: #{detail}"
+    end
+
+    def self.one_line(body)
+      text = body.to_s.gsub(/\s+/, " ").strip
+      (text.length > MAX_ERROR_BODY) ? "#{text[0, MAX_ERROR_BODY]}…" : text
+    end
+
+    def self.rejected(code, body)
+      reason = one_line(body)
+      message = reason.empty? ? "chat completion failed (#{code})" : "chat completion failed (#{code}): #{reason}"
+      # 404 is the other first-run wall: the default model isn't on the server.
+      message += " — is the model pulled? (e.g. ollama pull <model>)" if code == "404"
+      message
     end
 
     # Returns [message, usage] — usage is the raw "usage" hash from the
@@ -79,13 +151,11 @@ module Lyman
         "Content-Type" => "application/json"
       )
 
-      unless response.is_a?(Net::HTTPSuccess)
-        raise "chat completion failed (#{response.code}): #{response.body}"
-      end
+      raise TransportError, rejected(response.code, response.body) unless response.is_a?(Net::HTTPSuccess)
 
       body = JSON.parse(response.body)
       message = body.dig("choices", 0, "message")
-      raise "chat completion response had no message: #{response.body}" unless message
+      raise TransportError, "chat completion response had no message: #{one_line(response.body)}" unless message
       [message, body["usage"]]
     end
 
@@ -105,7 +175,7 @@ module Lyman
 
       http.request(request) do |response|
         unless response.is_a?(Net::HTTPSuccess)
-          raise "chat completion failed (#{response.code}): #{response.read_body}"
+          raise TransportError, rejected(response.code, response.read_body)
         end
 
         response.read_body do |chunk|

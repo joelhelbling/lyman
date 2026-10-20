@@ -61,8 +61,8 @@ class ChatCompletionTest < Minitest::Test
     }.to_json
   end
 
-  def http_response(body, content_type: "application/json")
-    "HTTP/1.1 200 OK\r\nContent-Type: #{content_type}\r\nConnection: close\r\nContent-Length: #{body.bytesize}\r\n\r\n#{body}"
+  def http_response(body, content_type: "application/json", status: "200 OK")
+    "HTTP/1.1 #{status}\r\nContent-Type: #{content_type}\r\nConnection: close\r\nContent-Length: #{body.bytesize}\r\n\r\n#{body}"
   end
 
   def test_non_streaming_request_and_response_decomposition
@@ -303,5 +303,104 @@ class ChatCompletionTest < Minitest::Test
     thread.join(5)
 
     assert_equal convo.wire_messages, captured.first["messages"]
+  end
+
+  # ── Transport failure (issue #33) ─────────────────────────────────────────
+  # Every way the wire can fail comes back as one named class, on one line:
+  # a shell catches Lyman::Workers::TransportError and a user can grep for it.
+
+  def one_turn(base_url, **options)
+    convo = Lyman::Conversation.new(system_prompt: "be terse").with_user_message("hi")
+    worker = Lyman::Workers.chat_completion(base_url: base_url, model: "test-model", **options)
+    (source_worker([convo]) | worker).shift
+  end
+
+  def assert_transport_error(message = nil)
+    error = assert_raises(Lyman::Workers::TransportError) { yield }
+    assert_equal 1, error.message.lines.size, "one line, not a trace: #{error.message}"
+    assert_includes error.message, message if message
+    error
+  end
+
+  def test_an_unreachable_endpoint_raises_transport_error_naming_the_endpoint
+    error = assert_transport_error { one_turn("http://127.0.0.1:1") }
+
+    assert_includes error.message, "can't reach http://127.0.0.1:1"
+    assert_includes error.message, "is your server running?"
+  end
+
+  def test_a_missing_model_raises_transport_error_with_the_servers_own_reason
+    body = {"error" => {"message" => "model 'doesnotexist:1b' not found"}}.to_json
+    captured = []
+    base_url, thread = start_fake_server(captured, http_response(body, status: "404 Not Found"))
+
+    error = assert_transport_error("chat completion failed (404)") { one_turn(base_url) }
+    thread.join(5)
+
+    assert_includes error.message, "model 'doesnotexist:1b' not found"
+    assert_includes error.message, "is the model pulled?"
+  end
+
+  # Streaming is the repl's path, so the streaming branch has to fail the
+  # same way the blocking one does.
+  def test_a_streaming_request_reports_a_non_2xx_as_transport_error_too
+    body = {"error" => {"message" => "model not found"}}.to_json
+    captured = []
+    base_url, thread = start_fake_server(captured, http_response(body, status: "500 Internal Server Error"))
+
+    error = assert_transport_error("chat completion failed (500)") { one_turn(base_url, on_delta: ->(_text) {}) }
+    thread.join(5)
+
+    assert_includes error.message, "model not found"
+  end
+
+  # A server error page is a wall of HTML; the message stays one line.
+  def test_a_multiline_error_body_is_collapsed_onto_the_one_line
+    captured = []
+    base_url, thread = start_fake_server(captured, http_response("<html>\n  <body>boom</body>\n</html>",
+      content_type: "text/html", status: "502 Bad Gateway"))
+
+    error = assert_transport_error("chat completion failed (502)") { one_turn(base_url) }
+    thread.join(5)
+
+    assert_includes error.message, "<html> <body>boom</body> </html>"
+  end
+
+  # "200 OK with nothing usable in it" is a different bug than a dead
+  # socket, but it's still the transport failing to produce a reply — and a
+  # shell that catches one class should catch it too.
+  def test_a_reply_with_no_message_is_a_transport_error_too
+    captured = []
+    base_url, thread = start_fake_server(captured, http_response({"choices" => []}.to_json))
+
+    assert_transport_error("no message") { one_turn(base_url) }
+    thread.join(5)
+  end
+
+  # A server that accepts the connection and then never answers: the
+  # message has to name the knob that would fix it, and its value.
+  def start_silent_server
+    server = TCPServer.new("127.0.0.1", 0)
+    thread = Thread.new do
+      client = server.accept
+      sleep 2 # hold the connection open, say nothing
+      client.close
+      server.close
+    rescue IOError, Errno::EBADF
+      nil
+    end
+    [server, thread, "http://127.0.0.1:#{server.addr[1]}"]
+  end
+
+  def test_a_read_timeout_raises_transport_error_naming_read_timeout_and_its_value
+    server, thread, base_url = start_silent_server
+
+    error = assert_transport_error { one_turn(base_url, read_timeout: 1) }
+
+    assert_includes error.message, "can't reach #{base_url}"
+    assert_includes error.message, "read_timeout: 1"
+  ensure
+    server&.close
+    thread&.join(5)
   end
 end
