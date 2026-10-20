@@ -171,7 +171,15 @@ module FileReader
     # empty (the nil footgun: a nil from a source ends the stream
     # permanently).
     rounds << conversation.with_user_message(task)
-    result = pipeline.shift
+    result =
+      begin
+        pipeline.shift
+      rescue Lyman::Workers::TransportError => e
+        # The caller here is a model, not a terminal: an unreachable
+        # sub-agent model is an answer about being unreachable, not an
+        # exception that reaches tool_execution as "raised ...".
+        return "file_reader couldn't reach the model: #{e.message}"
+      end
 
     # Tool calls still pending means the round counter cut the circuit off
     # mid-work (runaway? alone can't tell — it's also true when the answer

@@ -285,6 +285,20 @@ class FileReaderTest < Minitest::Test
     end
   end
 
+  # An unreachable sub-agent model is an answer about being unreachable:
+  # tool_execution would otherwise hand the calling model
+  # "Tool file_reader raised Lyman::Workers::TransportError: ...".
+  def test_an_unreachable_model_answers_with_that_fact_instead_of_raising
+    with_tree("f.txt" => "hi\n") do |root|
+      tool = file_reader(root: root, default_model: "m", default_base_url: UNREACHABLE_BASE_URL)
+
+      result = tool[:handler].call({"path" => "f.txt", "query" => "q"})
+
+      assert_includes result, "file_reader couldn't reach the model"
+      assert_includes result, "can't reach #{UNREACHABLE_BASE_URL}"
+    end
+  end
+
   def test_escape_attempt_is_refused_without_delegating
     Dir.mktmpdir do |dir|
       project = File.join(dir, "project")

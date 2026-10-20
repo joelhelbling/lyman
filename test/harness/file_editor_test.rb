@@ -127,6 +127,40 @@ class FileEditorTest < Minitest::Test
     assert_equal "Pass a request describing the change to make.", tool[:handler].call({})
   end
 
+  # 200 for the first +ok_calls+ chat requests, 503 for every one after:
+  # a model that dies mid-circuit.
+  def start_flaky_server(script, bodies, ok_calls)
+    server = TCPServer.new("127.0.0.1", 0)
+    index = 0
+    thread = Thread.new do
+      loop do
+        client = server.accept
+        client.gets
+        headers = {}
+        while (line = client.gets) && line != "\r\n"
+          key, value = line.split(":", 2)
+          headers[key.strip.downcase] = value.strip
+        end
+        bodies << JSON.parse(client.read(headers["content-length"].to_i))
+
+        message = script[[index, script.size - 1].min]
+        index += 1
+        body, status =
+          if index <= ok_calls
+            [{"choices" => [{"message" => message}]}.to_json, "200 OK"]
+          else
+            [%({"error":"server is busy"}), "503 Service Unavailable"]
+          end
+        client.write("HTTP/1.1 #{status}\r\nContent-Type: application/json\r\n" \
+          "Content-Length: #{body.bytesize}\r\nConnection: close\r\n\r\n#{body}")
+        client.close
+      rescue IOError, Errno::EBADF
+        break
+      end
+    end
+    [server, thread, "http://127.0.0.1:#{server.addr[1]}"]
+  end
+
   def test_end_to_end_patches_the_file_and_reports_the_summary_and_changed_path
     with_tree("greet.rb" => GREET) do |root|
       with_server(edit_script) do |base_url, bodies|
@@ -379,6 +413,39 @@ class FileEditorTest < Minitest::Test
 
         assert_equal "m", bodies.last["model"]
       end
+    end
+  end
+
+  # Same posture as the reader: the caller is a model, and "couldn't reach
+  # the model" is the report, not an exception through tool_execution.
+  def test_an_unreachable_model_reports_the_failure_instead_of_raising
+    with_tree("greet.rb" => GREET) do |root|
+      result = editor(root: root, base_url: UNREACHABLE_BASE_URL)[:handler].call({"request" => "upcase the name"})
+
+      assert_includes result, "file_editor couldn't reach the model"
+      assert_includes result, "can't reach #{UNREACHABLE_BASE_URL}"
+      assert_includes result, "No files were changed."
+      assert_equal GREET, File.read(File.join(root, "greet.rb"))
+    end
+  end
+
+  # A circuit can die mid-work with files already changed; the report says
+  # both, because a half-made change the caller can't see is the worst
+  # outcome of the three.
+  def test_a_model_that_dies_mid_circuit_reports_the_failure_and_what_it_changed
+    with_tree("greet.rb" => GREET) do |root|
+      bodies = []
+      server, thread, base_url = start_flaky_server(edit_script, bodies, 2)
+
+      result = editor(root: root, base_url: base_url)[:handler].call({"request" => "in greet.rb, make greet upcase the name"})
+
+      assert_includes result, "file_editor couldn't reach the model"
+      assert_includes result, "chat completion failed (503)"
+      assert_includes result, "Changed before it failed: greet.rb"
+      assert_includes File.read(File.join(root, "greet.rb")), "name.upcase"
+    ensure
+      server&.close
+      thread&.join(5)
     end
   end
 

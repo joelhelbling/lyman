@@ -72,6 +72,14 @@ pipeline =
 # with_user_message returns a new conversation, and the finished turn
 # comes back from the pipeline.
 rounds << conversation.with_user_message(task)
-result = pipeline.shift
+result =
+  begin
+    pipeline.shift
+  rescue Lyman::Workers::TransportError => e
+    # A script has no next turn to keep, so the legible exit is the one line
+    # and a non-zero status — what a cron log or a calling script reads —
+    # not a backtrace. See docs/design/transport-failure.md.
+    abort e.message
+  end
 
 puts result.last_assistant_content

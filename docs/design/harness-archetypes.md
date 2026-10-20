@@ -124,6 +124,13 @@ mistake:
   is waiting; the daemon and script use the blocking transport because their
   consumers want the finished answer, not tokens. Same
   `Workers.chat_completion` seam either way.
+- **Transport failure.** A model call that can't be made raises
+  `Workers::TransportError`, and each shell decides what that looks like:
+  a line and another prompt (repl), a line and another accept (daemon), a
+  line and a non-zero exit (script). Because an error that escapes a worker
+  ends that pipeline's Fibers, the repl and daemon hold the circuit as a
+  definition they rebuild per turn/event rather than one long-lived
+  pipeline. See [transport-failure.md](transport-failure.md).
 
 ## Choosing an archetype
 

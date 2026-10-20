@@ -5,9 +5,12 @@ require "cli/ui"
 # Empty when piped, matching cli-ui's own no-tty behavior.
 TTY = $stdout.tty?
 GRAY = TTY ? CLI::UI.resolve_color(:gray).code : ""
+RED = TTY ? CLI::UI.resolve_color(:red).code : ""
 DIM = TTY ? "\e[2;3m" : "" # faint italic, for think previews
 RESET = TTY ? CLI::UI::Color::RESET.code : ""
 
 # Paint without CLI::UI.fmt so text we don't control (tool arguments and
-# results) can't be misread as {{markup}}.
+# results, a server's own error body) can't be misread as {{markup}}.
 def gray(text) = "#{GRAY}#{text}#{RESET}"
+
+def red(text) = "#{RED}#{text}#{RESET}"
