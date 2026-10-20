@@ -145,6 +145,29 @@
 
 ### Fixed
 
+- **A transport failure costs one line and one turn, not the session.**
+  Every way `Workers.chat_completion` can fail to get a reply now raises
+  `Lyman::Workers::TransportError`: an unreachable endpoint
+  (`Errno::ECONNREFUSED`, `SocketError`, `Net::OpenTimeout`…), a non-2xx (the
+  server's own body, collapsed onto one line, with an "is the model pulled?"
+  hint on 404), a read timeout naming `read_timeout` and its value, or a 2xx
+  with nothing usable in it. Each shipped shell catches that one class and
+  picks its own answer: the repl prints one red line (`red()` in
+  `harness/repl/style.rb`, `RoundPrinter#abort_round` stops the spinner so
+  the line isn't painted over) and keeps prompting; the daemon logs the line,
+  sends it back to the event's sender, and keeps accepting; a script `abort`s
+  with the line and a non-zero status; both agents return it as the
+  sub-agent's answer rather than raising through `tool_execution`. Rescuing
+  alone wasn't enough: an error that escapes a shifty worker terminates the
+  pipeline's Fibers, so `harness/repl.rb` and `harness/daemon.rb` now hold a
+  circuit *definition* built fresh per turn / per event — the posture the
+  compactor and the agents already had — while `harness/script.rb` shifts
+  once and keeps its plain pipeline. Nothing retries or falls back in the
+  library: the seam is the class and the rebuildable circuit. New
+  `test/harness/repl_test.rb`, `daemon_test.rb`, and `script_test.rb` drive
+  each archetype as a child process (stdin in, lines and exit status out).
+  See `docs/design/transport-failure.md` (issue #33).
+
 - **The declared Ruby floor works.** `Conversation#last_assistant_content`
   used `Array#rfind`, added in Ruby 4.0 (Feature #21678), while the gemspec
   and the wiki promised ≥ 3.2: on 3.2–3.4 every artifact that reads a final

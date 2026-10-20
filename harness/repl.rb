@@ -97,22 +97,28 @@ context_meter = ContextMeter.new(PROVIDER, MODEL)
 abridgement = Lyman::Abridgement::StubToolResults.new(keep_rounds: 2)
 
 # ── The circuit ─────────────────────────────────────────────────────────────
-pipeline =
+# A circuit *definition*, not a live pipeline: an error that escapes a worker
+# ends that pipeline's Fibers for good, so each turn runs a fresh instance of
+# it (the compactor builds its digest pipeline per batch for the same
+# reason). The `rounds` queue is shell state, not pipeline state — that's
+# what makes a failed turn recoverable. See docs/design/transport-failure.md.
+circuit = -> do
   source_worker { rounds.shift } |
-  side_worker { |_c| printer.start_round } |
-  Lyman::Workers.chat_completion(
-    base_url: BASE_URL, model: MODEL, tools: schemas,
-    on_delta: printer.method(:delta), abridgement: abridgement
-  ) |
-  side_worker { |_c| printer.finish_round } |
-  relay_worker { |c|
-    (c.pending_tool_calls.empty? || c.runaway?) ? c.finish : c
-  } |
-  side_worker { |c| tool_printer.calls(c) unless c.finished? } |
-  Lyman::Workers.tool_execution(handlers) |
-  side_worker { |c| tool_printer.results(c) unless c.finished? } |
-  side_worker { |c| rounds << c unless c.finished? } |
-  filter_worker { |c| c.finished? }
+    side_worker { |_c| printer.start_round } |
+    Lyman::Workers.chat_completion(
+      base_url: BASE_URL, model: MODEL, tools: schemas,
+      on_delta: printer.method(:delta), abridgement: abridgement
+    ) |
+    side_worker { |_c| printer.finish_round } |
+    relay_worker { |c|
+      (c.pending_tool_calls.empty? || c.runaway?) ? c.finish : c
+    } |
+    side_worker { |c| tool_printer.calls(c) unless c.finished? } |
+    Lyman::Workers.tool_execution(handlers) |
+    side_worker { |c| tool_printer.results(c) unless c.finished? } |
+    side_worker { |c| rounds << c unless c.finished? } |
+    filter_worker { |c| c.finished? }
+end
 
 # ── Shell process ───────────────────────────────────────────────────────────
 puts CLI::UI.fmt("{{bold:lyman}} ⇢ {{magenta:#{MODEL}}} @ {{blue:#{BASE_URL}}} ({{blue:#{PROVIDER.name}}})")
@@ -154,5 +160,14 @@ loop do
   # so state flows in the open: enqueue a new conversation carrying the
   # user's message, and rebind to the finished turn the circuit hands back.
   rounds << conversation.with_user_message(input)
-  conversation = pipeline.shift
+  begin
+    conversation = circuit.call.shift
+  rescue Lyman::Workers::TransportError => e
+    # One bad turn costs a turn, not the session. The state is already
+    # right: `conversation` is still the last good one, and `rounds` is
+    # empty (the circuit pulled the enqueue out of it before failing), so
+    # the next prompt starts clean. The shell owns how a failure reads.
+    printer.abort_round
+    puts red(e.message)
+  end
 end

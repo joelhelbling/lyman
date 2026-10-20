@@ -63,6 +63,26 @@ Point it at a different server or model with environment variables:
 LYMAN_MODEL=qwen3.5:2b LYMAN_BASE_URL=http://localhost:1234/v1 ruby harness/repl.rb
 ```
 
+## If nothing answers
+
+The two most likely first runs are a server that isn't running and a model
+that isn't pulled. Each says so on one line, and costs one turn rather than
+the session:
+
+```
+you> hi
+can't reach http://localhost:11434/v1: Failed to open TCP connection to localhost:11434 (Connection refused - connect(2) for "localhost" port 11434) — is your server running? (ollama serve, LM Studio, vLLM…)
+
+you> hi
+chat completion failed (404): {"error":{"message":"model 'gemma4:latest' not found"}} — is the model pulled? (e.g. ollama pull <model>)
+```
+
+The repl keeps prompting, the daemon logs the line and keeps accepting, and a
+script exits non-zero with it as its message. All three catch
+`Lyman::Workers::TransportError` — the one class `chat_completion` fails
+with, and the seam a retry or a fall-back-to-a-smaller-model worker is built
+from ([Transport failure](https://github.com/joelhelbling/lyman/blob/main/docs/design/transport-failure.md)).
+
 ## What got planted
 
 ```

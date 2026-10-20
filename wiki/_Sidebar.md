@@ -19,4 +19,5 @@
 - [Vision](https://github.com/joelhelbling/lyman/blob/main/docs/vision.md)
 - [Circuit pattern](https://github.com/joelhelbling/lyman/blob/main/docs/design/circuit-pattern.md)
 - [Harness archetypes](https://github.com/joelhelbling/lyman/blob/main/docs/design/harness-archetypes.md)
+- [Transport failure](https://github.com/joelhelbling/lyman/blob/main/docs/design/transport-failure.md)
 - [Deployment](https://github.com/joelhelbling/lyman/blob/main/docs/design/deployment.md)

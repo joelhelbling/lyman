@@ -31,6 +31,13 @@ class RoundPrinter
     puts if @printed
   end
 
+  # A round that never came back (the model call raised): the only thing the
+  # display owes the shell is a stopped spinner, so the shell's one-line
+  # failure message isn't painted over by a frame.
+  def abort_round
+    @spinner.stop
+  end
+
   private
 
   def emit(text)

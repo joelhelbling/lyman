@@ -168,6 +168,14 @@ Concrete consequences:
 - **Runaway turns:** the model⇄tool circuit is bounded by the round counter on
   `Conversation` (`runaway?` / `max_rounds`). Keep that guard intact when
   rewiring.
+- **Transport failure:** every way `chat_completion` fails to get a reply
+  raises `Lyman::Workers::TransportError` (unreachable endpoint, non-2xx,
+  timeout, unusable body) — shells catch that one class and decide what the
+  failure looks like. An error that escapes a shifty worker ends that
+  pipeline's Fibers, so a shell that must outlive one holds its circuit as a
+  definition it rebuilds per turn/event (repl, daemon, compactor, agents);
+  only a single-shift shell (script) may hold one long-lived pipeline. See
+  `docs/design/transport-failure.md`.
 - **Wire vs. conversation:** reasoning elements are kept on the `Conversation`
   for observability but stripped by `Conversation#wire_messages` by default —
   it rides the wire only when a harness explicitly opts in with

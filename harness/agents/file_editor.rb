@@ -205,7 +205,17 @@ module FileEditor
     # empty (the nil footgun: a nil from a source ends the stream
     # permanently).
     rounds << conversation.with_user_message(request)
-    report(pipeline.shift, max_rounds: max_rounds)
+    outcome =
+      begin
+        pipeline.shift
+      rescue Lyman::Workers::TransportError => e
+        # Same posture as the reader: report the failure to the calling
+        # model rather than raising — and report it honestly, since a
+        # circuit can die mid-work with files already changed.
+        detail = changed.empty? ? "No files were changed." : "Changed before it failed: #{changed.join(", ")}."
+        return "file_editor couldn't reach the model: #{e.message}\n#{detail}"
+      end
+    report(outcome, max_rounds: max_rounds)
   end
 
   # Wraps the patch tool's handler to record which files it actually

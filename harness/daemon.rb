@@ -55,20 +55,25 @@ abridgement = Lyman::Abridgement::StubToolResults.new(keep_rounds: 2)
 # ── The circuit ─────────────────────────────────────────────────────────────
 # Identical to the script archetype's circuit, plus one logging side_worker —
 # with no human watching, observability is spliced in, not bolted on.
-pipeline =
+#
+# A circuit *definition*, built fresh per event: an error that escapes a
+# worker ends that pipeline's Fibers for good, and a daemon outlives a bad
+# event. See docs/design/transport-failure.md.
+circuit = -> do
   source_worker { rounds.shift } |
-  Lyman::Workers.chat_completion(base_url: BASE_URL, model: MODEL, tools: schemas, abridgement: abridgement) |
-  relay_worker { |c|
-    (c.pending_tool_calls.empty? || c.runaway?) ? c.finish : c
-  } |
-  side_worker { |c|
-    c.pending_tool_calls.each do |call|
-      puts "  ⚙ #{call.dig("function", "name")} #{call.dig("function", "arguments")}"
-    end
-  } |
-  Lyman::Workers.tool_execution(handlers) |
-  side_worker { |c| rounds << c unless c.finished? } |
-  filter_worker { |c| c.finished? }
+    Lyman::Workers.chat_completion(base_url: BASE_URL, model: MODEL, tools: schemas, abridgement: abridgement) |
+    relay_worker { |c|
+      (c.pending_tool_calls.empty? || c.runaway?) ? c.finish : c
+    } |
+    side_worker { |c|
+      c.pending_tool_calls.each do |call|
+        puts "  ⚙ #{call.dig("function", "name")} #{call.dig("function", "arguments")}"
+      end
+    } |
+    Lyman::Workers.tool_execution(handlers) |
+    side_worker { |c| rounds << c unless c.finished? } |
+    filter_worker { |c| c.finished? }
+end
 
 # ── Shell process ───────────────────────────────────────────────────────────
 server = TCPServer.new(PORT)
@@ -102,11 +107,23 @@ loop do
   # with_user_message returns a new conversation, and the finished turn
   # comes back from the pipeline.
   rounds << conversation.with_user_message(event)
-  result = pipeline.shift
+  reply =
+    begin
+      circuit.call.shift.last_assistant_content.to_s
+    rescue Lyman::Workers::TransportError => e
+      # A failing event costs that event, not the daemon: `rounds` is empty
+      # again (the circuit pulled the enqueue out of it), the next accept
+      # builds a fresh circuit, and the sender gets the same one line the
+      # log does.
+      "error: #{e.message}"
+    end
 
-  reply = result.last_assistant_content.to_s
   puts "[#{Time.now.strftime("%H:%M:%S")}] reply: #{reply}"
-  client.puts reply
+  begin
+    client.puts reply
+  rescue IOError, SystemCallError
+    nil # a client that hung up while the model was thinking is not our problem either
+  end
   client.close
 rescue Interrupt
   puts "\nshutting down"

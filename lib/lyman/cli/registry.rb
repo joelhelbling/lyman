@@ -227,7 +227,7 @@ module Lyman
           source: "harness/repl/style.rb",
           dest: "harness/repl/style.rb",
           role: :owned,
-          description: "Terminal styling codes and the gray() helper shared by the repl display"
+          description: "Terminal styling codes and the gray()/red() helpers shared by the repl display"
         },
         "think_filter" => {
           source: "harness/repl/think_filter.rb",
